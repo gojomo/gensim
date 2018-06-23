@@ -11,23 +11,23 @@ Automated tests for VarEmbed wrapper.
 """
 
 import logging
-import os
 import sys
 
 import numpy as np
 
-if sys.version_info < (2, 7):
-    import unittest2 as unittest
-else:
-    import unittest
+import unittest
 
 from gensim.models.wrappers import varembed
+from gensim.test.utils import datapath
 
-# needed because sample data files are located in the same folder
-module_path = os.path.dirname(__file__)
-datapath = lambda fname: os.path.join(module_path, 'test_data', fname)
-varembed_model_vector_file = datapath('varembed_leecorpus_vectors.pkl')
-varembed_model_morfessor_file = datapath('varembed_leecorpus_morfessor.bin')
+try:
+    import morfessor  # noqa: F401
+except ImportError:
+    raise unittest.SkipTest("Test requires Morfessor to be installed, which is not available")
+
+
+varembed_model_vector_file = datapath('varembed_vectors.pkl')
+varembed_model_morfessor_file = datapath('varembed_morfessor.bin')
 
 
 class TestVarembed(unittest.TestCase):
@@ -39,7 +39,7 @@ class TestVarembed(unittest.TestCase):
     def testSimilarity(self):
         """Test n_similarity for vocab words"""
         model = varembed.VarEmbed.load_varembed_format(vectors=varembed_model_vector_file)
-        self.assertTrue(model.n_similarity(['grim'], ['peace']) == model.similarity('grim', 'peace'))
+        self.assertTrue(model.n_similarity(['result'], ['targets']) == model.similarity('result', 'targets'))
 
     def model_sanity(self, model):
         """Check vocabulary and vector size"""
@@ -58,16 +58,10 @@ class TestVarembed(unittest.TestCase):
         # Check syn0 is different for both models.
         self.assertFalse(np.allclose(model.syn0, model_with_morphemes.syn0))
 
-    @unittest.skipUnless(sys.version_info < (2, 7), 'Test to check throwing exception in Python 2.6 and earlier')
-    def testAddMorphemesThrowsExceptionInPython26(self):
-        self.assertRaises(
-            Exception, varembed.VarEmbed.load_varembed_format, vectors=varembed_model_vector_file,
-            morfessor_model=varembed_model_morfessor_file)
-
     def testLookup(self):
         """Test lookup of vector for a particular word and list"""
         model = varembed.VarEmbed.load_varembed_format(vectors=varembed_model_vector_file)
-        self.assertTrue(np.allclose(model['year'], model[['year']]))
+        self.assertTrue(np.allclose(model['language'], model[['language']]))
 
 
 if __name__ == '__main__':
