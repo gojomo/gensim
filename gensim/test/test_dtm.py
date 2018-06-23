@@ -10,9 +10,14 @@ import logging
 from subprocess import CalledProcessError
 import gensim
 import os
+import sys
 import unittest
 from gensim import corpora
-from gensim.test.utils import datapath
+
+
+# needed because sample data files are located in the same folder
+module_path = os.path.dirname(__file__)
+datapath = lambda fname: os.path.join(module_path, 'test_data', fname)
 
 
 class TestDtmModel(unittest.TestCase):
@@ -23,16 +28,18 @@ class TestDtmModel(unittest.TestCase):
         self.id2word = corpora.Dictionary.load(datapath('dtm_test.dict'))
         # first you need to setup the environment variable $DTM_PATH for the dtm executable file
         self.dtm_path = os.environ.get('DTM_PATH', None)
-        if not self.dtm_path:
-            self.skipTest("$DTM_PATH is not properly set up.")
+        if self.dtm_path is None:
+            if sys.version_info >= (2, 7, 0):
+                self.skipTest("$DTM_PATH is not properly set up.")
+            else:
+                logging.warning("$DTM_PATH is not properly set up.")
 
     def testDtm(self):
         if self.dtm_path is not None:
             model = gensim.models.wrappers.DtmModel(
                 self.dtm_path, self.corpus, self.time_slices, num_topics=2,
                 id2word=self.id2word, model='dtm', initialize_lda=True,
-                rng_seed=1
-            )
+                rng_seed=1)
             topics = model.show_topics(num_topics=2, times=2, num_words=10)
             self.assertEqual(len(topics), 4)
 
@@ -45,8 +52,7 @@ class TestDtmModel(unittest.TestCase):
             model = gensim.models.wrappers.DtmModel(
                 self.dtm_path, self.corpus, self.time_slices, num_topics=2,
                 id2word=self.id2word, model='fixed', initialize_lda=True,
-                rng_seed=1
-            )
+                rng_seed=1)
             topics = model.show_topics(num_topics=2, times=2, num_words=10)
             self.assertEqual(len(topics), 4)
 
@@ -61,9 +67,7 @@ class TestDtmModel(unittest.TestCase):
                 gensim.models.wrappers.DtmModel(
                     self.dtm_path, self.corpus, self.time_slices, num_topics=2,
                     id2word=self.id2word, model='dtm', initialize_lda=False,
-                    rng_seed=1
-                )
-
+                    rng_seed=1)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)

@@ -6,7 +6,6 @@ from glob import glob
 import nbformat
 from nbconvert.preprocessors import ExecutePreprocessor
 from nbconvert.preprocessors.execute import CellExecutionError
-"from smart_open import smart_open\n",
 
 
 def _notebook_run(path):
@@ -17,7 +16,7 @@ def _notebook_run(path):
     this_file_directory = os.path.dirname(__file__)
     errors = []
     with tempfile.NamedTemporaryFile(suffix=".ipynb", mode='wt') as fout:
-        with smart_open(path, 'rb') as f:
+        with open(path) as f:
             nb = nbformat.read(f, as_version=4)
             nb.metadata.get('kernelspec', {})['name'] = kernel_name
             ep = ExecutePreprocessor(kernel_name=kernel_name, timeout=10)
@@ -29,11 +28,16 @@ def _notebook_run(path):
                     print(str(e.traceback).split("\n")[-2])
                 else:
                     raise e
-            except RuntimeError as e:
+            except TimeoutError as e:
                 print(e)
 
             finally:
                 nbformat.write(nb, fout)
+        #nb = nbformat.read(fout, nbformat.current_nbformat)
+
+    #errors = errors.extend(
+        #[output for cell in nb.cells if "outputs" in cell
+        # for output in cell["outputs"] if output.output_type == "error"])
 
     return nb, errors
 

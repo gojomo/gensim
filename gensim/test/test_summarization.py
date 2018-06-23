@@ -18,29 +18,31 @@ import unittest
 
 from gensim import utils
 from gensim.corpora import Dictionary
-from gensim.summarization import summarize, summarize_corpus, keywords, mz_keywords
+from gensim.summarization import summarize, summarize_corpus, keywords
 
 
 class TestSummarizationTest(unittest.TestCase):
 
-    def _get_text_from_test_data(self, file):
-        pre_path = os.path.join(os.path.dirname(__file__), 'test_data')
-        with utils.smart_open(os.path.join(pre_path, file), mode="r") as f:
-            return f.read()
-
     def test_text_summarization(self):
-        text = self._get_text_from_test_data("mihalcea_tarau.txt")
+        pre_path = os.path.join(os.path.dirname(__file__), 'test_data')
+
+        with utils.smart_open(os.path.join(pre_path, "mihalcea_tarau.txt"), mode="r") as f:
+            text = f.read()
 
         # Makes a summary of the text.
         generated_summary = summarize(text)
 
         # To be compared to the method reference.
-        summary = self._get_text_from_test_data("mihalcea_tarau.summ.txt")
+        with utils.smart_open(os.path.join(pre_path, "mihalcea_tarau.summ.txt"), mode="r") as f:
+            summary = f.read()
 
         self.assertEqual(generated_summary, summary)
 
     def test_corpus_summarization(self):
-        text = self._get_text_from_test_data("mihalcea_tarau.txt")
+        pre_path = os.path.join(os.path.dirname(__file__), 'test_data')
+
+        with utils.smart_open(os.path.join(pre_path, "mihalcea_tarau.txt"), mode="r") as f:
+            text = f.read()
 
         # Generate the corpus.
         sentences = text.split("\n")
@@ -52,8 +54,9 @@ class TestSummarizationTest(unittest.TestCase):
         selected_documents = summarize_corpus(corpus)
 
         # They are compared to the method reference.
-        summary = self._get_text_from_test_data("mihalcea_tarau.summ.txt")
-        summary = summary.split('\n')
+        with utils.smart_open(os.path.join(pre_path, "mihalcea_tarau.summ.txt"), mode="r") as f:
+            summary = f.read()
+            summary = summary.split('\n')
 
         # Each sentence in the document selection has to be in the model summary.
         for doc_number, document in enumerate(selected_documents):
@@ -64,51 +67,65 @@ class TestSummarizationTest(unittest.TestCase):
             self.assertTrue(any(all(word in sentence for word in words)) for sentence in summary)
 
     def test_summary_from_unrelated_sentences(self):
-        # Tests that the summarization of a text with unrelated sentences is not empty string.
-        text = self._get_text_from_test_data("testsummarization_unrelated.txt")
-        generated_summary = summarize(text)
-        self.assertNotEqual(generated_summary, u"")
+        # Tests that the summarization of a text with unrelated sentences does not raise an exception.
+        pre_path = os.path.join(os.path.dirname(__file__), 'test_data')
 
-    def test_text_summarization_on_short_input_text_is_empty_string(self):
-        text = self._get_text_from_test_data("testsummarization_unrelated.txt")
+        with utils.smart_open(os.path.join(pre_path, "testsummarization_unrelated.txt"), mode="r") as f:
+            text = f.read()
+
+        generated_summary = summarize(text)
+
+        self.assertNotEqual(generated_summary, None)
+
+    def test_text_summarization_raises_exception_on_short_input_text(self):
+        pre_path = os.path.join(os.path.dirname(__file__), 'test_data')
+
+        with utils.smart_open(os.path.join(pre_path, "testsummarization_unrelated.txt"), mode="r") as f:
+            text = f.read()
 
         # Keeps the first 8 sentences to make the text shorter.
         text = "\n".join(text.split('\n')[:8])
 
-        self.assertNotEqual(summarize(text), u"")
+        self.assertTrue(summarize(text) is not None)
+        
+    def test_text_summarization_returns_input_on_single_input_sentence(self):
+        pre_path = os.path.join(os.path.dirname(__file__), 'test_data')
 
-    def test_text_summarization_raises_exception_on_single_input_sentence(self):
-        text = self._get_text_from_test_data("testsummarization_unrelated.txt")
+        with utils.smart_open(os.path.join(pre_path, "testsummarization_unrelated.txt"), mode="r") as f:
+            text = f.read()
 
         # Keeps the first sentence only.
         text = text.split('\n')[0]
 
         self.assertRaises(ValueError, summarize, text)
 
-    def test_corpus_summarization_is_not_empty_list_on_short_input_text(self):
-        text = self._get_text_from_test_data("testsummarization_unrelated.txt")
+    def test_corpus_summarization_raises_exception_on_short_input_text(self):
+        pre_path = os.path.join(os.path.dirname(__file__), 'test_data')
+
+        with utils.smart_open(os.path.join(pre_path, "testsummarization_unrelated.txt"), mode="r") as f:
+            text = f.read()
 
         # Keeps the first 8 sentences to make the text shorter.
         sentences = text.split('\n')[:8]
-
+        
         # Generate the corpus.
         tokens = [sentence.split() for sentence in sentences]
         dictionary = Dictionary(tokens)
         corpus = [dictionary.doc2bow(sentence_tokens) for sentence_tokens in tokens]
 
-        self.assertNotEqual(summarize_corpus(corpus), [])
+        self.assertTrue(summarize_corpus(corpus) is not None)
 
-    def test_empty_text_summarization_is_empty_string(self):
-        self.assertEqual(summarize(""), u"")
+    def test_empty_text_summarization_none(self):
+        self.assertTrue(summarize("") is None)
 
-    def test_empty_text_summarization_with_split_is_empty_list(self):
-        self.assertEqual(summarize("", split=True), [])
-
-    def test_empty_corpus_summarization_is_empty_list(self):
-        self.assertEqual(summarize_corpus([]), [])
+    def test_empty_corpus_summarization_is_none(self):
+        self.assertTrue(summarize_corpus([]) is None)
 
     def test_corpus_summarization_ratio(self):
-        text = self._get_text_from_test_data("mihalcea_tarau.txt")
+        pre_path = os.path.join(os.path.dirname(__file__), 'test_data')
+
+        with utils.smart_open(os.path.join(pre_path, "mihalcea_tarau.txt"), mode="r") as f:
+            text = f.read()
 
         # Generate the corpus.
         sentences = text.split('\n')
@@ -125,7 +142,10 @@ class TestSummarizationTest(unittest.TestCase):
             self.assertEqual(len(selected_docs), expected_summary_length)
 
     def test_repeated_keywords(self):
-        text = self._get_text_from_test_data("testrepeatedkeywords.txt")
+        pre_path = os.path.join(os.path.dirname(__file__), 'test_data')
+
+        with utils.smart_open(os.path.join(pre_path, "testrepeatedkeywords.txt")) as f:
+            text = f.read()
 
         kwds = keywords(text)
         self.assertTrue(len(kwds.splitlines()))
@@ -137,7 +157,10 @@ class TestSummarizationTest(unittest.TestCase):
         self.assertTrue(len(kwds_lst))
 
     def test_keywords_runs(self):
-        text = self._get_text_from_test_data("mihalcea_tarau.txt")
+        pre_path = os.path.join(os.path.dirname(__file__), 'test_data')
+
+        with utils.smart_open(os.path.join(pre_path, "mihalcea_tarau.txt")) as f:
+            text = f.read()
 
         kwds = keywords(text)
         self.assertTrue(len(kwds.splitlines()))
@@ -148,27 +171,11 @@ class TestSummarizationTest(unittest.TestCase):
         kwds_lst = keywords(text, split=True)
         self.assertTrue(len(kwds_lst))
 
-    def test_mz_keywords(self):
+    def test_low_distinct_words_corpus_summarization_is_none(self):
         pre_path = os.path.join(os.path.dirname(__file__), 'test_data')
 
-        with utils.smart_open(os.path.join(pre_path, "head500.noblanks.cor")) as f:
-            text = utils.to_unicode(f.read())
-        text = u' '.join(text.split()[:10240])
-        kwds = mz_keywords(text)
-        self.assertTrue(kwds.startswith('autism'))
-        self.assertTrue(kwds.endswith('uk'))
-        self.assertTrue(len(kwds.splitlines()))
-
-        kwds_lst = mz_keywords(text, split=True)
-        self.assertTrue(len(kwds_lst))
-        # Automatic thresholding selects words with n_blocks / n_blocks+1
-        # bits of entropy. For this text, n_blocks=10
-        n_blocks = 10.
-        kwds_auto = mz_keywords(text, scores=True, weighted=False, threshold='auto')
-        self.assertTrue(kwds_auto[-1][1] > (n_blocks / (n_blocks + 1.)))
-
-    def test_low_distinct_words_corpus_summarization_is_empty_list(self):
-        text = self._get_text_from_test_data("testlowdistinctwords.txt")
+        with utils.smart_open(os.path.join(pre_path, "testlowdistinctwords.txt"), mode="r") as f:
+            text = f.read()
 
         # Generate the corpus.
         sentences = text.split("\n")
@@ -176,16 +183,7 @@ class TestSummarizationTest(unittest.TestCase):
         dictionary = Dictionary(tokens)
         corpus = [dictionary.doc2bow(sentence_tokens) for sentence_tokens in tokens]
 
-        self.assertEqual(summarize_corpus(corpus), [])
-
-    def test_low_distinct_words_summarization_is_empty_string(self):
-        text = self._get_text_from_test_data("testlowdistinctwords.txt")
-        self.assertEqual(summarize(text), u"")
-
-    def test_low_distinct_words_summarization_with_split_is_empty_list(self):
-        text = self._get_text_from_test_data("testlowdistinctwords.txt")
-        self.assertEqual(summarize(text, split=True), [])
-
+        self.assertTrue(summarize_corpus(corpus) is None)
 
 if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)

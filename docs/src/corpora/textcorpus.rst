@@ -1,8 +1,8 @@
-:mod:`corpora.textcorpus` -- Tools for building corpora with dictionaries
-=========================================================================
+:mod:`corpora.textcorpus` -- Building corpora with dictionaries
+=================================================================
 
 .. automodule:: gensim.corpora.textcorpus
-    :synopsis: Tools for building corpora with dictionaries
+    :synopsis: Building corpora with dictionaries
     :members:
     :inherited-members:
     :undoc-members:
