@@ -289,11 +289,11 @@ from collections import Iterable
 
 import gensim.models._fasttext_bin
 
-from gensim.models.word2vec import Word2VecVocab, Word2VecTrainables, train_sg_pair, train_cbow_pair  # noqa
+from gensim.models.word2vec import Word2VecVocab, Word2VecTrainables
 from gensim.models.keyedvectors import KeyedVectors, _l2_norm, _save_word2vec_format
 from gensim.models.base_any2vec import BaseWordEmbeddingsModel
-from gensim.models.utils_any2vec import ft_ngram_hashes
 from gensim.utils import deprecated, call_on_class_only, open, NO_CYTHON
+
 
 logger = logging.getLogger(__name__)
 
@@ -303,6 +303,10 @@ try:
         train_batch_cbow,
         FAST_VERSION,
         MAX_WORDS_IN_BATCH,
+        compute_ngrams,
+        compute_ngrams_bytes,
+        ft_hash_broken,
+        ft_hash_bytes,
     )
     from gensim.models.fasttext_corpusfile import train_epoch_sg, train_epoch_cbow
 except ImportError:
@@ -1781,6 +1785,60 @@ def _try_upgrade(wv):
             "from scratch."
         )
         wv.compatible_hash = False
+
+#
+# UTF-8 bytes that begin with 10 are subsequent bytes of a multi-byte sequence,
+# as opposed to a new character.
+#
+_MB_MASK = 0xC0
+_MB_START = 0x80
+
+
+def _byte_to_int_py3(b):
+    return b
+
+
+def _byte_to_int_py2(b):
+    return ord(b)
+
+
+_byte_to_int = _byte_to_int_py2 if six.PY2 else _byte_to_int_py3
+
+
+def _is_utf8_continue(b):
+    return _byte_to_int(b) & _MB_MASK == _MB_START
+
+
+def ft_ngram_hashes(word, minn, maxn, num_buckets, fb_compatible=True):
+    """Calculate the ngrams of the word and hash them.
+
+    Parameters
+    ----------
+    word : str
+        The word to calculate ngram hashes for.
+    minn : int
+        Minimum ngram length
+    maxn : int
+        Maximum ngram length
+    num_buckets : int
+        The number of buckets
+    fb_compatible : boolean, optional
+        True for compatibility with the Facebook implementation.
+        False for compatibility with the old Gensim implementation.
+
+    Returns
+    -------
+        A list of hashes (integers), one per each detected ngram.
+
+    """
+    if fb_compatible:
+        encoded_ngrams = compute_ngrams_bytes(word, minn, maxn)
+        hashes = [ft_hash_bytes(n) % num_buckets for n in encoded_ngrams]
+    else:
+        text_ngrams = compute_ngrams(word, minn, maxn)
+        hashes = [ft_hash_broken(n) % num_buckets for n in text_ngrams]
+    return hashes
+
 
 # BACKWARD COMPATIBILITY FOR OLDER PICKLES
 from gensim.models import keyedvectors
