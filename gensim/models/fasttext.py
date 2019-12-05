@@ -290,10 +290,9 @@ from collections import Iterable
 import gensim.models._fasttext_bin
 
 from gensim.models.word2vec import Word2VecVocab, Word2VecTrainables, train_sg_pair, train_cbow_pair  # noqa
-from gensim.models.keyedvectors import KeyedVectors, _l2_norm
+from gensim.models.keyedvectors import KeyedVectors, _l2_norm, _save_word2vec_format
 from gensim.models.base_any2vec import BaseWordEmbeddingsModel
 from gensim.models.utils_any2vec import ft_ngram_hashes
-from gensim.models.utils_any2vec import _save_word2vec_format
 from gensim.utils import deprecated, call_on_class_only, open, NO_CYTHON
 
 logger = logging.getLogger(__name__)
