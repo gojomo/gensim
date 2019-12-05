@@ -212,9 +212,13 @@ class KeyedVectors(utils.SaveLoad):
     def load(cls, fname_or_handle, **kwargs):
         _kv = super(KeyedVectors, cls).load(fname_or_handle, **kwargs)
         # handle rename/consolidation into index2key
-        if not hasattr(_kv, 'index2key'):
-            _kv.index2key = _kv.__dict__.pop('index2word', _kv.__dict__.pop('index2entity', None))
         return _kv
+
+    def _load_specials(self, *args, **kwargs):
+        super(KeyedVectors, self)._load_specials(*args, **kwargs)
+        # fixup rename/consolidation into index2key of older index2word, index2entity
+        if not hasattr(self, 'index2key'):
+            self.index2key = self.__dict__.pop('index2word', self.__dict__.pop('index2word', None))
 
     def get_vector(self, entity):
         """Get the entity's representations in vector space, as a 1D numpy array.
@@ -1269,6 +1273,8 @@ class KeyedVectors(utils.SaveLoad):
         )
         return layer
 
+# to help 3.8.1 & older pickles load properly
+Word2VecKeyedVectors = KeyedVectors
 
 class Doc2VecKeyedVectors(KeyedVectors):
 
