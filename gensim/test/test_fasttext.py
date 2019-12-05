@@ -187,13 +187,11 @@ class TestFastTextModel(unittest.TestCase):
         model.save(tmpf)
         loaded_model = FT_gensim.load(tmpf)
         self.assertTrue(loaded_model.wv.vectors_norm is None)
-        self.assertTrue(loaded_model.wv.vectors_ngrams_norm is None)
 
         wv = model.wv
         wv.save(tmpf)
         loaded_kv = FastTextKeyedVectors.load(tmpf)
         self.assertTrue(loaded_kv.vectors_norm is None)
-        self.assertTrue(loaded_kv.vectors_ngrams_norm is None)
 
     def model_sanity(self, model):
         self.assertEqual(model.wv.vectors.shape, (len(model.wv.vocab), model.vector_size))
