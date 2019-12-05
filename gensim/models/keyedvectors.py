@@ -220,31 +220,60 @@ class KeyedVectors(utils.SaveLoad):
         if not hasattr(self, 'index2key'):
             self.index2key = self.__dict__.pop('index2word', self.__dict__.pop('index2word', None))
 
-    def get_vector(self, entity):
-        """Get the entity's representations in vector space, as a 1D numpy array.
+    def __getitem__(self, entities):
+        """Get vector representation of `entities`.
 
         Parameters
         ----------
-        entity : str
-            Identifier of the entity to return the vector for.
+        entities : {str, list of str}
+            Input entity/entities.
 
         Returns
         -------
         numpy.ndarray
-            Vector for the specified entity.
+            Vector representation for `entities` (1D if `entities` is string, otherwise - 2D).
+
+        """
+        if isinstance(entities, string_types):
+            # allow calls like trained_model['office'], as a shorthand for trained_model[['office']]
+            return self.get_vector(entities)
+
+        return vstack([self.get_vector(entity) for entity in entities])
+
+    def get_vector(self, key, use_norm=False):
+        """Get the entity's representations in vector space, as a 1D numpy array.
+
+        Parameters
+        ----------
+        key : str
+            Identifier of the vector to return
+        use_norm : bool, optional
+            If True - resulting vector will be L2-normalized (unit euclidean length).
+
+        Returns
+        -------
+        numpy.ndarray
+            Vector for the specified key.
 
         Raises
         ------
         KeyError
-            If the given entity identifier doesn't exist.
+            If the given key doesn't exist.
 
         """
-        if entity in self.vocab:
-            result = self.vectors[self.vocab[entity].index]
+        if key in self.vocab:
+            if use_norm:
+                result = self.vectors_norm[self.vocab[key].index]
+            else:
+                result = self.vectors[self.vocab[key].index]
             result.setflags(write=False)
             return result
         else:
-            raise KeyError("'%s' not in vocabulary" % entity)
+            raise KeyError("Key '%s' not in vocabulary" % key)
+
+    def word_vec(self, *args, **kwargs):
+        """Compatibility alias for get_vector()"""
+        return self.get_vector(*args, **kwargs)
 
     def add(self, entities, weights, replace=False):
         """Append entities and theirs vectors in a manual way.
@@ -305,26 +334,6 @@ class KeyedVectors(utils.SaveLoad):
 
         self.add(entities, weights, replace=True)
 
-    def __getitem__(self, entities):
-        """Get vector representation of `entities`.
-
-        Parameters
-        ----------
-        entities : {str, list of str}
-            Input entity/entities.
-
-        Returns
-        -------
-        numpy.ndarray
-            Vector representation for `entities` (1D if `entities` is string, otherwise - 2D).
-
-        """
-        if isinstance(entities, string_types):
-            # allow calls like trained_model['office'], as a shorthand for trained_model[['office']]
-            return self.get_vector(entities)
-
-        return vstack([self.get_vector(entity) for entity in entities])
-
     def __contains__(self, key):
         return key in self.vocab
 
@@ -381,39 +390,6 @@ class KeyedVectors(utils.SaveLoad):
         # don't bother storing the cached normalized vectors
         kwargs['ignore'] = kwargs.get('ignore', ['vectors_norm'])
         super(KeyedVectors, self).save(*args, **kwargs)
-
-    def word_vec(self, word, use_norm=False):
-        """Get `word` representations in vector space, as a 1D numpy array.
-
-        Parameters
-        ----------
-        word : str
-            Input word
-        use_norm : bool, optional
-            If True - resulting vector will be L2-normalized (unit euclidean length).
-
-        Returns
-        -------
-        numpy.ndarray
-            Vector representation of `word`.
-
-        Raises
-        ------
-        KeyError
-            If word not in vocabulary.
-
-        """
-        if word in self.vocab:
-            if use_norm:
-                result = self.vectors_norm[self.vocab[word].index]
-            else:
-                result = self.vectors[self.vocab[word].index]
-
-            result.setflags(write=False)
-            return result
-        else:
-            raise KeyError("word '%s' not in vocabulary" % word)
-
 
     def most_similar(self, positive=None, negative=None, topn=10, restrict_vocab=None, indexer=None):
         """Find the top-N most similar words.
@@ -1788,7 +1764,7 @@ class FastTextKeyedVectors(KeyedVectors):
         kwargs['ignore'] = kwargs.get('ignore', ignore_attrs)
         super(FastTextKeyedVectors, self).save(*args, **kwargs)
 
-    def word_vec(self, word, use_norm=False):
+    def get_vector(self, word, use_norm=False):
         """Get `word` representations in vector space, as a 1D numpy array.
 
         Parameters
@@ -1810,7 +1786,7 @@ class FastTextKeyedVectors(KeyedVectors):
 
         """
         if word in self.vocab:
-            return super(FastTextKeyedVectors, self).word_vec(word, use_norm)
+            return super(FastTextKeyedVectors, self).get_vector(word, use_norm)
         elif self.bucket == 0:
             raise KeyError('cannot calculate vector for OOV word without ngrams')
         else:
@@ -2087,7 +2063,7 @@ def _rollback_optimization(kv):
         "Save the loaded model to a new file and reload to suppress this message."
     )
     assert hasattr(kv, 'hash2index')
-    assert hasattr(kv, 'num_ngram_vectors')
+    assert hasattr(kv, 'bucket')
 
     kv.vectors_ngrams = _unpack(kv.vectors_ngrams, kv.bucket, kv.hash2index)
 
