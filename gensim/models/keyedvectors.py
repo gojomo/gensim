@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Author: Shiva Manne <manneshiva@gmail.com>
+# Author: Gensim Contributors
 # Copyright (C) 2018 RaRe Technologies s.r.o.
 # Licensed under the GNU LGPL v2.1 - http://www.gnu.org/licenses/lgpl.html
 
@@ -158,8 +158,6 @@ and so on.
 
 """
 
-from __future__ import division  # py3 "true division"
-
 from itertools import chain
 import logging
 from numbers import Integral
@@ -186,7 +184,6 @@ from gensim.models.utils_any2vec import (
     ft_ngram_hashes,
 )
 
-#
 # For backwards compatibility, see https://github.com/RaRe-Technologies/gensim/issues/2201
 #
 from gensim.models.deprecated.keyedvectors import EuclideanKeyedVectors  # noqa
@@ -194,59 +191,30 @@ from gensim.models.deprecated.keyedvectors import EuclideanKeyedVectors  # noqa
 logger = logging.getLogger(__name__)
 
 
-class Vocab(object):
-    """A single vocabulary item, used internally for collecting per-word frequency/sampling info,
-    and for constructing binary trees (incl. both word leaves and inner nodes).
+class KeyedVectors(utils.SaveLoad):
+    """Abstract base class / interface for various types of word vectors."""
+    """Class containing common methods for operations over word vectors."""
+    """Mapping between words and vectors for the :class:`~gensim.models.Word2Vec` model.
+    Used to perform operations on the vectors such as vector lookup, distance, similarity etc.
 
     """
-    def __init__(self, **kwargs):
-        self.count = 0
-        self.__dict__.update(kwargs)
-
-    def __lt__(self, other):  # used for sorting in a priority queue
-        return self.count < other.count
-
-    def __str__(self):
-        vals = ['%s:%r' % (key, self.__dict__[key]) for key in sorted(self.__dict__) if not key.startswith('_')]
-        return "%s(%s)" % (self.__class__.__name__, ', '.join(vals))
-
-
-class BaseKeyedVectors(utils.SaveLoad):
-    """Abstract base class / interface for various types of word vectors."""
     def __init__(self, vector_size):
-        self.vectors = zeros((0, vector_size))
+        self.vectors = zeros((0, vector_size))  # was syn0, once upon a time
+        self.vectors_norm = None  # was syn0norm, once upon a time
         self.vocab = {}
         self.vector_size = vector_size
-        self.index2entity = []
+        self.index2key = []  # fka index2entity or index2word
 
     def save(self, fname_or_handle, **kwargs):
-        super(BaseKeyedVectors, self).save(fname_or_handle, **kwargs)
+        super(KeyedVectors, self).save(fname_or_handle, **kwargs)
 
     @classmethod
     def load(cls, fname_or_handle, **kwargs):
-        return super(BaseKeyedVectors, cls).load(fname_or_handle, **kwargs)
-
-    def similarity(self, entity1, entity2):
-        """Compute cosine similarity between two entities, specified by their string id."""
-        raise NotImplementedError()
-
-    def most_similar(self, **kwargs):
-        """Find the top-N most similar entities.
-        Possibly have `positive` and `negative` list of entities in `**kwargs`.
-
-        """
-        return NotImplementedError()
-
-    def distance(self, entity1, entity2):
-        """Compute distance between vectors of two input entities, specified by their string id."""
-        raise NotImplementedError()
-
-    def distances(self, entity1, other_entities=()):
-        """Compute distances from a given entity (its string id) to all entities in `other_entity`.
-        If `other_entities` is empty, return the distance between `entity1` and all entities in vocab.
-
-        """
-        raise NotImplementedError()
+        _kv = super(KeyedVectors, cls).load(fname_or_handle, **kwargs)
+        # handle rename/consolidation into index2key
+        if not hasattr(_kv, 'index2key'):
+            _kv.index2key = _kv.__dict__.pop('index2word', _kv.__dict__.pop('index2entity', None))
+        return _kv
 
     def get_vector(self, entity):
         """Get the entity's representations in vector space, as a 1D numpy array.
@@ -353,8 +321,8 @@ class BaseKeyedVectors(utils.SaveLoad):
 
         return vstack([self.get_vector(entity) for entity in entities])
 
-    def __contains__(self, entity):
-        return entity in self.vocab
+    def __contains__(self, key):
+        return key in self.vocab
 
     def most_similar_to_given(self, entity1, entities_list):
         """Get the `entity` from `entities_list` most similar to `entity1`."""
@@ -368,53 +336,29 @@ class BaseKeyedVectors(utils.SaveLoad):
         closer_node_indices = np.where(all_distances < all_distances[e2_index])[0]
         return [self.index2entity[index] for index in closer_node_indices if index != e1_index]
 
+    def words_closer_than(self, word1, word2):
+        return self.closer_than(word1, word2)
+
     def rank(self, entity1, entity2):
         """Rank of the distance of `entity2` from `entity1`, in relation to distances of all entities from `entity1`."""
         return len(self.closer_than(entity1, entity2)) + 1
 
-
-class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
-    """Class containing common methods for operations over word vectors."""
-    def __init__(self, vector_size):
-        super(WordEmbeddingsKeyedVectors, self).__init__(vector_size=vector_size)
-        self.vectors_norm = None
-        self.index2word = []
-
-    @property
-    @deprecated("Attribute will be removed in 4.0.0, use self instead")
-    def wv(self):
-        return self
-
+    ## backward compatibility
     @property
     def index2entity(self):
-        return self.index2word
+        return self.index2key
 
     @index2entity.setter
     def index2entity(self, value):
-        self.index2word = value
+        self.index2key = value
 
     @property
-    @deprecated("Attribute will be removed in 4.0.0, use self.vectors instead")
-    def syn0(self):
-        return self.vectors
+    def index2word(self):
+        return self.index2key
 
-    @syn0.setter
-    @deprecated("Attribute will be removed in 4.0.0, use self.vectors instead")
-    def syn0(self, value):
-        self.vectors = value
-
-    @property
-    @deprecated("Attribute will be removed in 4.0.0, use self.vectors_norm instead")
-    def syn0norm(self):
-        return self.vectors_norm
-
-    @syn0norm.setter
-    @deprecated("Attribute will be removed in 4.0.0, use self.vectors_norm instead")
-    def syn0norm(self, value):
-        self.vectors_norm = value
-
-    def __contains__(self, word):
-        return word in self.vocab
+    @index2word.setter
+    def index2word(self, value):
+        self.index2key = value
 
     def save(self, *args, **kwargs):
         """Save KeyedVectors.
@@ -426,13 +370,13 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
 
         See Also
         --------
-        :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.load`
+        :meth:`~gensim.models.keyedvectors.KeyedVectors.load`
             Load saved model.
 
         """
         # don't bother storing the cached normalized vectors
         kwargs['ignore'] = kwargs.get('ignore', ['vectors_norm'])
-        super(WordEmbeddingsKeyedVectors, self).save(*args, **kwargs)
+        super(KeyedVectors, self).save(*args, **kwargs)
 
     def word_vec(self, word, use_norm=False):
         """Get `word` representations in vector space, as a 1D numpy array.
@@ -466,26 +410,6 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
         else:
             raise KeyError("word '%s' not in vocabulary" % word)
 
-    def get_vector(self, word):
-        return self.word_vec(word)
-
-    def words_closer_than(self, w1, w2):
-        """Get all words that are closer to `w1` than `w2` is to `w1`.
-
-        Parameters
-        ----------
-        w1 : str
-            Input word.
-        w2 : str
-            Input word.
-
-        Returns
-        -------
-        list (str)
-            List of words that are closer to `w1` than `w2` is to `w1`.
-
-        """
-        return super(WordEmbeddingsKeyedVectors, self).closer_than(w1, w2)
 
     def most_similar(self, positive=None, negative=None, topn=10, restrict_vocab=None, indexer=None):
         """Find the top-N most similar words.
@@ -1089,95 +1013,6 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
                 section['section'], 100.0 * correct / (correct + incorrect), correct, correct + incorrect
             )
 
-    @deprecated("Method will be removed in 4.0.0, use self.evaluate_word_analogies() instead")
-    def accuracy(self, questions, restrict_vocab=30000, most_similar=most_similar, case_insensitive=True):
-        """Compute accuracy of the model.
-
-        The accuracy is reported (=printed to log and returned as a list) for each
-        section separately, plus there's one aggregate summary at the end.
-
-        Parameters
-        ----------
-        questions : str
-            Path to file, where lines are 4-tuples of words, split into sections by ": SECTION NAME" lines.
-            See `gensim/test/test_data/questions-words.txt` as example.
-        restrict_vocab : int, optional
-            Ignore all 4-tuples containing a word not in the first `restrict_vocab` words.
-            This may be meaningful if you've sorted the model vocabulary by descending frequency (which is standard
-            in modern word embedding models).
-        most_similar : function, optional
-            Function used for similarity calculation.
-        case_insensitive : bool, optional
-            If True - convert all words to their uppercase form before evaluating the performance.
-            Useful to handle case-mismatch between training tokens and words in the test set.
-            In case of multiple case variants of a single word, the vector for the first occurrence
-            (also the most frequent if vocabulary is sorted) is taken.
-
-        Returns
-        -------
-        list of dict of (str, (str, str, str)
-            Full lists of correct and incorrect predictions divided by sections.
-
-        """
-        ok_vocab = [(w, self.vocab[w]) for w in self.index2word[:restrict_vocab]]
-        ok_vocab = {w.upper(): v for w, v in reversed(ok_vocab)} if case_insensitive else dict(ok_vocab)
-
-        sections, section = [], None
-        with utils.open(questions, 'rb') as fin:
-            for line_no, line in enumerate(fin):
-                # TODO: use level3 BLAS (=evaluate multiple questions at once), for speed
-                line = utils.to_unicode(line)
-                if line.startswith(': '):
-                    # a new section starts => store the old section
-                    if section:
-                        sections.append(section)
-                        self.log_accuracy(section)
-                    section = {'section': line.lstrip(': ').strip(), 'correct': [], 'incorrect': []}
-                else:
-                    if not section:
-                        raise ValueError("Missing section header before line #%i in %s" % (line_no, questions))
-                    try:
-                        if case_insensitive:
-                            a, b, c, expected = [word.upper() for word in line.split()]
-                        else:
-                            a, b, c, expected = [word for word in line.split()]
-                    except ValueError:
-                        logger.info("Skipping invalid line #%i in %s", line_no, questions)
-                        continue
-                    if a not in ok_vocab or b not in ok_vocab or c not in ok_vocab or expected not in ok_vocab:
-                        logger.debug("Skipping line #%i with OOV words: %s", line_no, line.strip())
-                        continue
-                    original_vocab = self.vocab
-                    self.vocab = ok_vocab
-                    ignore = {a, b, c}  # input words to be ignored
-                    predicted = None
-                    # find the most likely prediction, ignoring OOV words and input words
-                    sims = most_similar(self, positive=[b, c], negative=[a], topn=None, restrict_vocab=restrict_vocab)
-                    self.vocab = original_vocab
-                    for index in matutils.argsort(sims, reverse=True):
-                        predicted = self.index2word[index].upper() if case_insensitive else self.index2word[index]
-                        if predicted in ok_vocab and predicted not in ignore:
-                            if predicted != expected:
-                                logger.debug("%s: expected %s, predicted %s", line.strip(), expected, predicted)
-                            break
-                    if predicted == expected:
-                        section['correct'].append((a, b, c, expected))
-                    else:
-                        section['incorrect'].append((a, b, c, expected))
-        if section:
-            # store the last section, too
-            sections.append(section)
-            self.log_accuracy(section)
-
-        total = {
-            'section': 'total',
-            'correct': list(chain.from_iterable(s['correct'] for s in sections)),
-            'incorrect': list(chain.from_iterable(s['incorrect'] for s in sections)),
-        }
-        self.log_accuracy(total)
-        sections.append(total)
-        return sections
-
     @staticmethod
     def log_evaluate_word_pairs(pearson, spearman, oov, pairs):
         logger.info('Pearson correlation coefficient against %s: %.4f', pairs, pearson[0])
@@ -1292,8 +1127,8 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
         --------
         You **cannot continue training** after doing a replace.
         The model becomes effectively read-only: you can call
-        :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.most_similar`,
-        :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.similarity`, etc., but not train.
+        :meth:`~gensim.models.keyedvectors.KeyedVectors.most_similar`,
+        :meth:`~gensim.models.keyedvectors.KeyedVectors.similarity`, etc., but not train.
 
         """
         if getattr(self, 'vectors_norm', None) is None or replace:
@@ -1330,14 +1165,6 @@ class WordEmbeddingsKeyedVectors(BaseKeyedVectors):
 
         return rcs
 
-
-
-
-class Word2VecKeyedVectors(WordEmbeddingsKeyedVectors):
-    """Mapping between words and vectors for the :class:`~gensim.models.Word2Vec` model.
-    Used to perform operations on the vectors such as vector lookup, distance, similarity etc.
-
-    """
     def save_word2vec_format(self, fname, fvocab=None, binary=False, total_vec=None):
         """Store the input-hidden weight matrix in the same format used by the original
         C word2vec-tool, for compatibility.
@@ -1442,20 +1269,8 @@ class Word2VecKeyedVectors(WordEmbeddingsKeyedVectors):
         )
         return layer
 
-    @classmethod
-    def load(cls, fname_or_handle, **kwargs):
-        model = super(WordEmbeddingsKeyedVectors, cls).load(fname_or_handle, **kwargs)
-        if isinstance(model, FastTextKeyedVectors):
-            if not hasattr(model, 'compatible_hash'):
-                model.compatible_hash = False
 
-        return model
-
-
-KeyedVectors = Word2VecKeyedVectors  # alias for backward compatibility
-
-
-class Doc2VecKeyedVectors(BaseKeyedVectors):
+class Doc2VecKeyedVectors(KeyedVectors):
 
     def __init__(self, vector_size, mapfile_path):
         super(Doc2VecKeyedVectors, self).__init__(vector_size=vector_size)
@@ -1475,16 +1290,6 @@ class Doc2VecKeyedVectors(BaseKeyedVectors):
     @index2entity.setter
     def index2entity(self, value):
         self.offset2doctag = value
-
-    @property
-    @deprecated("Attribute will be removed in 4.0.0, use docvecs.vectors_docs instead")
-    def doctag_syn0(self):
-        return self.vectors_docs
-
-    @property
-    @deprecated("Attribute will be removed in 4.0.0, use docvecs.vectors_docs_norm instead")
-    def doctag_syn0norm(self):
-        return self.vectors_docs_norm
 
     def __getitem__(self, index):
         """Get vector representation of `index`.
@@ -1847,7 +1652,7 @@ class Doc2VecKeyedVectors(BaseKeyedVectors):
             return max_rawint + 1 + doctags[index].offset
 
 
-class FastTextKeyedVectors(WordEmbeddingsKeyedVectors):
+class FastTextKeyedVectors(KeyedVectors):
     """Vectors and vocab for :class:`~gensim.models.fasttext.FastText`.
 
     Implements significant parts of the FastText algorithm.  For example,
@@ -1901,41 +1706,24 @@ class FastTextKeyedVectors(WordEmbeddingsKeyedVectors):
     """
     def __init__(self, vector_size, min_n, max_n, bucket, compatible_hash):
         super(FastTextKeyedVectors, self).__init__(vector_size=vector_size)
-        self.vectors_vocab = None
-        self.vectors_vocab_norm = None
-        self.vectors_ngrams = None
-        self.vectors_ngrams_norm = None
+        self.vectors_vocab = None  # fka syn0_vocab
+        self.vectors_vocab_norm = None  # fka syn0_vocab_norm
+        self.vectors_ngrams = None  # fka syn0_ngrams
+        self.vectors_ngrams_norm = None  # fka syn0_ngrams_norm
         self.buckets_word = None
         self.min_n = min_n
         self.max_n = max_n
-        self.bucket = bucket
+        self.bucket = bucket  # count of buckets, fka num_ngram_vectors
         self.compatible_hash = compatible_hash
 
     @classmethod
     def load(cls, fname_or_handle, **kwargs):
-        model = super(WordEmbeddingsKeyedVectors, cls).load(fname_or_handle, **kwargs)
+        model = super(FastTextKeyedVectors, cls).load(fname_or_handle, **kwargs)
+        if isinstance(model, FastTextKeyedVectors):
+            if not hasattr(model, 'compatible_hash'):
+                model.compatible_hash = False
         _try_upgrade(model)
         return model
-
-    @property
-    @deprecated("Attribute will be removed in 4.0.0, use self.vectors_vocab instead")
-    def syn0_vocab(self):
-        return self.vectors_vocab
-
-    @property
-    @deprecated("Attribute will be removed in 4.0.0, use self.vectors_vocab_norm instead")
-    def syn0_vocab_norm(self):
-        return self.vectors_vocab_norm
-
-    @property
-    @deprecated("Attribute will be removed in 4.0.0, use self.vectors_ngrams instead")
-    def syn0_ngrams(self):
-        return self.vectors_ngrams
-
-    @property
-    @deprecated("Attribute will be removed in 4.0.0, use self.vectors_ngrams_norm instead")
-    def syn0_ngrams_norm(self):
-        return self.vectors_ngrams_norm
 
     def __contains__(self, word):
         """Check if `word` or any character ngrams in `word` are present in the vocabulary.
@@ -2204,10 +1992,6 @@ class FastTextKeyedVectors(WordEmbeddingsKeyedVectors):
             word_vec /= len(ngram_hashes) + 1
             self.vectors[v.index] = word_vec
 
-    @property
-    @deprecated("Attribute will be removed in 4.0.0, use self.bucket instead")
-    def num_ngram_vectors(self):
-        return self.bucket
 
 
 def _process_fasttext_vocab(iterable, min_n, max_n, num_buckets, compatible_hash):
@@ -2419,3 +2203,23 @@ def _try_upgrade(wv):
             "from scratch."
         )
         wv.compatible_hash = False
+
+
+
+class Vocab(object):
+    """A single vocabulary item, used internally for collecting per-word frequency/sampling info,
+    and for constructing binary trees (incl. both word leaves and inner nodes).
+
+    """
+    def __init__(self, **kwargs):
+        self.count = 0
+        self.__dict__.update(kwargs)
+
+    def __lt__(self, other):  # used for sorting in a priority queue
+        return self.count < other.count
+
+    def __str__(self):
+        vals = ['%s:%r' % (key, self.__dict__[key]) for key in sorted(self.__dict__) if not key.startswith('_')]
+        return "%s(%s)" % (self.__class__.__name__, ', '.join(vals))
+
+

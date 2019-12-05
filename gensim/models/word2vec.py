@@ -132,7 +132,7 @@ import itertools
 import warnings
 
 from gensim.utils import keep_vocab_item, call_on_class_only
-from gensim.models.keyedvectors import Vocab, Word2VecKeyedVectors
+from gensim.models.keyedvectors import Vocab, KeyedVectors as Word2VecKeyedVectors
 from gensim.models.base_any2vec import BaseWordEmbeddingsModel
 
 try:
