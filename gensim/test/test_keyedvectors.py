@@ -15,8 +15,7 @@ import unittest
 import numpy as np
 
 from gensim.corpora import Dictionary
-from gensim.models.keyedvectors import KeyedVectors as EuclideanKeyedVectors, WordEmbeddingSimilarityIndex, \
-    FastTextKeyedVectors
+from gensim.models.keyedvectors import KeyedVectors as EuclideanKeyedVectors, FastTextKeyedVectors
 from gensim.test.utils import datapath
 
 import gensim.models.keyedvectors
@@ -25,66 +24,10 @@ import gensim.models.keyedvectors
 logger = logging.getLogger(__name__)
 
 
-class TestWordEmbeddingSimilarityIndex(unittest.TestCase):
-    def setUp(self):
-        self.vectors = EuclideanKeyedVectors.load_word2vec_format(
-            datapath('euclidean_vectors.bin'), binary=True, datatype=np.float64)
-
-    def test_most_similar(self):
-        """Test most_similar returns expected results."""
-
-        # check the handling of out-of-dictionary terms
-        index = WordEmbeddingSimilarityIndex(self.vectors)
-        self.assertLess(0, len(list(index.most_similar(u"holiday", topn=10))))
-        self.assertEqual(0, len(list(index.most_similar(u"out-of-dictionary term", topn=10))))
-
-        # check that the topn works as expected
-        index = WordEmbeddingSimilarityIndex(self.vectors)
-        results = list(index.most_similar(u"holiday", topn=10))
-        self.assertLess(0, len(results))
-        self.assertGreaterEqual(10, len(results))
-        results = list(index.most_similar(u"holiday", topn=20))
-        self.assertLess(10, len(results))
-        self.assertGreaterEqual(20, len(results))
-
-        # check that the term itself is not returned
-        index = WordEmbeddingSimilarityIndex(self.vectors)
-        terms = [term for term, similarity in index.most_similar(u"holiday", topn=len(self.vectors.vocab))]
-        self.assertFalse(u"holiday" in terms)
-
-        # check that the threshold works as expected
-        index = WordEmbeddingSimilarityIndex(self.vectors, threshold=0.0)
-        results = list(index.most_similar(u"holiday", topn=10))
-        self.assertLess(0, len(results))
-        self.assertGreaterEqual(10, len(results))
-
-        index = WordEmbeddingSimilarityIndex(self.vectors, threshold=1.0)
-        results = list(index.most_similar(u"holiday", topn=10))
-        self.assertEqual(0, len(results))
-
-        # check that the exponent works as expected
-        index = WordEmbeddingSimilarityIndex(self.vectors, exponent=1.0)
-        first_similarities = np.array([similarity for term, similarity in index.most_similar(u"holiday", topn=10)])
-        index = WordEmbeddingSimilarityIndex(self.vectors, exponent=2.0)
-        second_similarities = np.array([similarity for term, similarity in index.most_similar(u"holiday", topn=10)])
-        self.assertTrue(np.allclose(first_similarities**2.0, second_similarities))
-
-
 class TestEuclideanKeyedVectors(unittest.TestCase):
     def setUp(self):
         self.vectors = EuclideanKeyedVectors.load_word2vec_format(
             datapath('euclidean_vectors.bin'), binary=True, datatype=np.float64)
-
-    def test_similarity_matrix(self):
-        """Test similarity_matrix returns expected results."""
-
-        documents = [[u"government", u"denied", u"holiday"], [u"holiday", u"slowing", u"hollingworth"]]
-        dictionary = Dictionary(documents)
-        similarity_matrix = self.vectors.similarity_matrix(dictionary).todense()
-
-        # checking the existence of ones on the main diagonal
-        self.assertTrue(
-            (np.diag(similarity_matrix) == np.ones(similarity_matrix.shape[0])).all())
 
     def test_most_similar(self):
         """Test most_similar returns expected results."""
