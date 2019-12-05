@@ -15,19 +15,20 @@ import unittest
 import numpy as np
 
 from gensim.corpora import Dictionary
-from gensim.models.keyedvectors import KeyedVectors as EuclideanKeyedVectors, FastTextKeyedVectors
+from gensim.models.keyedvectors import KeyedVectors, FastTextKeyedVectors
 from gensim.test.utils import datapath
 
 import gensim.models.keyedvectors
 
-
 logger = logging.getLogger(__name__)
 
 
-class TestEuclideanKeyedVectors(unittest.TestCase):
+class TestKeyedVectors(unittest.TestCase):
     def setUp(self):
-        self.vectors = EuclideanKeyedVectors.load_word2vec_format(
+        self.vectors = KeyedVectors.load_word2vec_format(
             datapath('euclidean_vectors.bin'), binary=True, datatype=np.float64)
+        self.model_path = datapath("w2v_keyedvectors_load_test.modeldata")
+        self.vocab_path = datapath("w2v_keyedvectors_load_test.vocab")
 
     def test_most_similar(self):
         """Test most_similar returns expected results."""
@@ -170,7 +171,7 @@ class TestEuclideanKeyedVectors(unittest.TestCase):
             self.assertTrue(np.allclose(self.vectors[ent], vector))
 
         # Test `add` on empty kv.
-        kv = EuclideanKeyedVectors(self.vectors.vector_size)
+        kv = KeyedVectors(self.vectors.vector_size)
         for ent, vector in zip(entities, vectors):
             kv.add(ent, vector)
 
@@ -191,7 +192,7 @@ class TestEuclideanKeyedVectors(unittest.TestCase):
             self.assertTrue(np.allclose(self.vectors[ent], vector))
 
         # Test `add` on empty kv.
-        kv = EuclideanKeyedVectors(self.vectors.vector_size)
+        kv = KeyedVectors(self.vectors.vector_size)
         kv[entities] = vectors
         self.assertEqual(len(kv.vocab), len(entities))
 
@@ -229,8 +230,43 @@ class TestEuclideanKeyedVectors(unittest.TestCase):
         for ent, vector in zip(entities, vectors):
             self.assertTrue(np.allclose(self.vectors[ent], vector))
 
+    def test_load_model_and_vocab_file_strict(self):
+        """Test loading model and voacab files which have decoding errors: strict mode"""
+        with self.assertRaises(UnicodeDecodeError):
+            gensim.models.KeyedVectors.load_word2vec_format(
+                self.model_path, fvocab=self.vocab_path, binary=False, unicode_errors="strict")
+
+    def test_load_model_and_vocab_file_replace(self):
+        """Test loading model and voacab files which have decoding errors: replace mode"""
+        model = gensim.models.KeyedVectors.load_word2vec_format(
+            self.model_path, fvocab=self.vocab_path, binary=False, unicode_errors="replace")
+        self.assertEqual(model.vocab[u'ありがとう�'].count, 123)
+        self.assertEqual(model.vocab[u'どういたしまして�'].count, 789)
+        self.assertEqual(model.vocab[u'ありがとう�'].index, 0)
+        self.assertEqual(model.vocab[u'どういたしまして�'].index, 1)
+        self.assertTrue(np.array_equal(
+            model.get_vector(u'ありがとう�'), np.array([.6, .6, .6], dtype=np.float32)))
+        self.assertTrue(np.array_equal(
+            model.get_vector(u'どういたしまして�'), np.array([.1, .2, .3], dtype=np.float32)))
+
+    def test_load_model_and_vocab_file_ignore(self):
+        """Test loading model and voacab files which have decoding errors: ignore mode"""
+        model = gensim.models.KeyedVectors.load_word2vec_format(
+            self.model_path, fvocab=self.vocab_path, binary=False, unicode_errors="ignore")
+        print(model.vocab.keys())
+        self.assertEqual(model.vocab[u'ありがとう'].count, 123)
+        self.assertEqual(model.vocab[u'どういたしまして'].count, 789)
+        self.assertEqual(model.vocab[u'ありがとう'].index, 0)
+        self.assertEqual(model.vocab[u'どういたしまして'].index, 1)
+        self.assertTrue(np.array_equal(
+            model.get_vector(u'ありがとう'), np.array([.6, .6, .6], dtype=np.float32)))
+        self.assertTrue(np.array_equal(
+            model.get_vector(u'どういたしまして'), np.array([.1, .2, .3], dtype=np.float32)))
+
+
+class TestFastTextKeyedVectors(unittest.TestCase):
     def test_ft_kv_backward_compat_w_360(self):
-        kv = EuclideanKeyedVectors.load(datapath("ft_kv_3.6.0.model.gz"))
+        kv = KeyedVectors.load(datapath("ft_kv_3.6.0.model.gz"))
         ft_kv = FastTextKeyedVectors.load(datapath("ft_kv_3.6.0.model.gz"))
 
         expected = ['trees', 'survey', 'system', 'graph', 'interface']
@@ -302,45 +338,6 @@ class Gensim320Test(unittest.TestCase):
         path = datapath('old_keyedvectors_320.dat')
         vectors = gensim.models.keyedvectors.KeyedVectors.load(path)
         self.assertTrue(vectors.word_vec('computer') is not None)
-
-
-class Word2VecKeyedVectorsTest(unittest.TestCase):
-    def setUp(self):
-        self.model_path = datapath("w2v_keyedvectors_load_test.modeldata")
-        self.vocab_path = datapath("w2v_keyedvectors_load_test.vocab")
-
-    def test_load_model_and_vocab_file_strict(self):
-        """Test loading model and vocab files which have decoding errors: strict mode"""
-        with self.assertRaises(UnicodeDecodeError):
-            gensim.models.KeyedVectors.load_word2vec_format(
-                self.model_path, fvocab=self.vocab_path, binary=False, unicode_errors="strict")
-
-    def test_load_model_and_vocab_file_replace(self):
-        """Test loading model and vocab files which have decoding errors: replace mode"""
-        model = gensim.models.KeyedVectors.load_word2vec_format(
-            self.model_path, fvocab=self.vocab_path, binary=False, unicode_errors="replace")
-        self.assertEqual(model.vocab[u'ありがとう�'].count, 123)
-        self.assertEqual(model.vocab[u'どういたしまして�'].count, 789)
-        self.assertEqual(model.vocab[u'ありがとう�'].index, 0)
-        self.assertEqual(model.vocab[u'どういたしまして�'].index, 1)
-        self.assertTrue(np.array_equal(
-            model.get_vector(u'ありがとう�'), np.array([.6, .6, .6], dtype=np.float32)))
-        self.assertTrue(np.array_equal(
-            model.get_vector(u'どういたしまして�'), np.array([.1, .2, .3], dtype=np.float32)))
-
-    def test_load_model_and_vocab_file_ignore(self):
-        """Test loading model and vocab files which have decoding errors: ignore mode"""
-        model = gensim.models.KeyedVectors.load_word2vec_format(
-            self.model_path, fvocab=self.vocab_path, binary=False, unicode_errors="ignore")
-        print(model.vocab.keys())
-        self.assertEqual(model.vocab[u'ありがとう'].count, 123)
-        self.assertEqual(model.vocab[u'どういたしまして'].count, 789)
-        self.assertEqual(model.vocab[u'ありがとう'].index, 0)
-        self.assertEqual(model.vocab[u'どういたしまして'].index, 1)
-        self.assertTrue(np.array_equal(
-            model.get_vector(u'ありがとう'), np.array([.6, .6, .6], dtype=np.float32)))
-        self.assertTrue(np.array_equal(
-            model.get_vector(u'どういたしまして'), np.array([.1, .2, .3], dtype=np.float32)))
 
 
 if __name__ == '__main__':
