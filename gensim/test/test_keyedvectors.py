@@ -156,10 +156,6 @@ class TestKeyedVectors(unittest.TestCase):
         self.assertEqual(self.vectors.rank('war', 'war'), 1)
         self.assertEqual(self.vectors.rank('war', 'terrorism'), 3)
 
-    def test_wv_property(self):
-        """Test that the deprecated `wv` property returns `self`. To be removed in v4.0.0."""
-        self.assertTrue(self.vectors is self.vectors)
-
     def test_add_single(self):
         """Test that adding entity in a manual way works correctly."""
         entities = ['___some_entity{}_not_present_in_keyed_vectors___'.format(i) for i in range(5)]
@@ -275,21 +271,6 @@ class TestKeyedVectors(unittest.TestCase):
             model.get_vector(u'どういたしまして'), np.array([.1, .2, .3], dtype=np.float32)))
 
 
-class TestFastTextKeyedVectors(unittest.TestCase):
-    def test_ft_kv_backward_compat_w_360(self):
-        kv = KeyedVectors.load(datapath("ft_kv_3.6.0.model.gz"))
-        ft_kv = FastTextKeyedVectors.load(datapath("ft_kv_3.6.0.model.gz"))
-
-        expected = ['trees', 'survey', 'system', 'graph', 'interface']
-        actual = [word for (word, similarity) in kv.most_similar("human", topn=5)]
-
-        self.assertEqual(actual, expected)
-
-        actual = [word for (word, similarity) in ft_kv.most_similar("human", topn=5)]
-
-        self.assertEqual(actual, expected)
-
-
 class L2NormTest(unittest.TestCase):
     def test(self):
         m = np.array(range(1, 10), dtype=np.float32)
@@ -300,48 +281,6 @@ class L2NormTest(unittest.TestCase):
 
         gensim.models.keyedvectors._l2_norm(m, replace=True)
         self.assertTrue(np.allclose(m, norm))
-
-
-class UnpackTest(unittest.TestCase):
-    def test_copy_sanity(self):
-        m = np.array(range(9))
-        m.shape = (3, 3)
-        hash2index = {10: 0, 11: 1, 12: 2}
-
-        n = gensim.models.keyedvectors._unpack_copy(m, 25, hash2index)
-        self.assertTrue(np.all(m[0] == n[10]))
-        self.assertTrue(np.all(m[1] == n[11]))
-        self.assertTrue(np.all(m[2] == n[12]))
-
-    def test_sanity(self):
-        m = np.array(range(9))
-        m.shape = (3, 3)
-        hash2index = {10: 0, 11: 1, 12: 2}
-
-        n = gensim.models.keyedvectors._unpack(m, 25, hash2index)
-        self.assertTrue(np.all(np.array([0, 1, 2]) == n[10]))
-        self.assertTrue(np.all(np.array([3, 4, 5]) == n[11]))
-        self.assertTrue(np.all(np.array([6, 7, 8]) == n[12]))
-
-    def test_tricky(self):
-        m = np.array(range(9))
-        m.shape = (3, 3)
-        hash2index = {1: 0, 0: 1, 12: 2}
-
-        n = gensim.models.keyedvectors._unpack(m, 25, hash2index)
-        self.assertTrue(np.all(np.array([3, 4, 5]) == n[0]))
-        self.assertTrue(np.all(np.array([0, 1, 2]) == n[1]))
-        self.assertTrue(np.all(np.array([6, 7, 8]) == n[12]))
-
-    def test_identity(self):
-        m = np.array(range(9))
-        m.shape = (3, 3)
-        hash2index = {0: 0, 1: 1, 2: 2}
-
-        n = gensim.models.keyedvectors._unpack(m, 25, hash2index)
-        self.assertTrue(np.all(np.array([0, 1, 2]) == n[0]))
-        self.assertTrue(np.all(np.array([3, 4, 5]) == n[1]))
-        self.assertTrue(np.all(np.array([6, 7, 8]) == n[2]))
 
 
 class Gensim320Test(unittest.TestCase):
