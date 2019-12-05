@@ -1014,7 +1014,7 @@ class NativeTrainingContinuationTest(unittest.TestCase):
         trained = train_gensim()
         native = load_native()
 
-        self.assertEqual(trained.bucket, native.bucket)
+        self.assertEqual(trained.wv.bucket, native.wv.bucket)
         #
         # Only if match_gensim=True in init_post_load
         #
@@ -1103,7 +1103,7 @@ class NativeTrainingContinuationTest(unittest.TestCase):
 
     def test_load_native_pretrained(self):
         model = gensim.models.fasttext.load_facebook_model(datapath('toy-model-pretrained.bin'))
-        actual = model['monarchist']
+        actual = model.wv['monarchist']
         expected = np.array([0.76222, 1.0669, 0.7055, -0.090969, -0.53508])
         self.assertTrue(np.allclose(expected, actual, atol=10e-4))
 
