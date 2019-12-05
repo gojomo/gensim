@@ -580,7 +580,6 @@ class FastText(BaseWordEmbeddingsModel):
         """Clear the model's internal structures after training has finished to free up RAM."""
         self.wv.vectors_norm = None
         self.wv.vectors_vocab_norm = None
-        self.wv.vectors_ngrams_norm = None
         self.wv.buckets_word = None
 
     def estimate_memory(self, vocab_size=None, report=None):
@@ -830,7 +829,7 @@ class FastText(BaseWordEmbeddingsModel):
 
         """
         kwargs['ignore'] = kwargs.get(
-            'ignore', ['vectors_norm', 'vectors_vocab_norm', 'vectors_ngrams_norm', 'buckets_word'])
+            'ignore', ['vectors_norm', 'vectors_vocab_norm', 'buckets_word'])
         super(FastText, self).save(*args, **kwargs)
 
     @classmethod
@@ -1262,11 +1261,6 @@ class FastTextKeyedVectors(KeyedVectors):
         A vector for each ngram across all entities in the vocabulary.
         Each row is a vector that corresponds to a bucket.
         Columns correspond to vector dimensions.
-    vectors_ngrams_norm : np.array
-        Same as vectors_ngrams, but the vectors are L2 normalized.
-        Under some conditions, may actually be the same matrix as
-        vectors_ngrams, e.g. if :func:`init_sims` was called with
-        replace=True.
     buckets_word : dict
         Maps vocabulary items (by their index) to the buckets they occur in.
 
@@ -1276,7 +1270,6 @@ class FastTextKeyedVectors(KeyedVectors):
         self.vectors_vocab = None  # fka syn0_vocab
         self.vectors_vocab_norm = None  # fka syn0_vocab_norm
         self.vectors_ngrams = None  # fka syn0_ngrams
-        self.vectors_ngrams_norm = None  # fka syn0_ngrams_norm
         self.buckets_word = None
         self.min_n = min_n
         self.max_n = max_n
@@ -1342,7 +1335,6 @@ class FastTextKeyedVectors(KeyedVectors):
         ignore_attrs = [
             'vectors_norm',
             'vectors_vocab_norm',
-            'vectors_ngrams_norm',
             'buckets_word',
             'hash2index',
         ]
@@ -1376,10 +1368,7 @@ class FastTextKeyedVectors(KeyedVectors):
             raise KeyError('cannot calculate vector for OOV word without ngrams')
         else:
             word_vec = np.zeros(self.vectors_ngrams.shape[1], dtype=np.float32)
-            if use_norm:
-                ngram_weights = self.vectors_ngrams_norm
-            else:
-                ngram_weights = self.vectors_ngrams
+            ngram_weights = self.vectors_ngrams
             ngram_hashes = ft_ngram_hashes(word, self.min_n, self.max_n, self.bucket, self.compatible_hash)
             if len(ngram_hashes) == 0:
                 #
@@ -1394,28 +1383,12 @@ class FastTextKeyedVectors(KeyedVectors):
                 return word_vec
             for nh in ngram_hashes:
                 word_vec += ngram_weights[nh]
-            return word_vec / len(ngram_hashes)
+            word_vec /= len(ngram_hashes)
+            if use_norm:
+                return word_vec / np.linalg.norm(word_vec)
+            else:
+                return word_vec
 
-    def init_sims(self, replace=False):
-        """Precompute L2-normalized vectors.
-
-        Parameters
-        ----------
-        replace : bool, optional
-            If True - forget the original vectors and only keep the normalized ones = saves lots of memory!
-
-        Warnings
-        --------
-        You **cannot continue training** after doing a replace.
-        The model becomes effectively read-only: you can call
-        :meth:`~gensim.models.fasttext.FastTextKeyedVectors.most_similar`,
-        :meth:`~gensim.models.fasttext.FastTextKeyedVectors.similarity`, etc., but not train.
-
-        """
-        super(FastTextKeyedVectors, self).init_sims(replace)
-        if getattr(self, 'vectors_ngrams_norm', None) is None or replace:
-            logger.info("precomputing L2-norms of ngram weight vectors")
-            self.vectors_ngrams_norm = _l2_norm(self.vectors_ngrams, replace=replace)
 
     def save_word2vec_format(self, fname, fvocab=None, binary=False, total_vec=None):
         """Store the input-hidden weight matrix in the same format used by the original
