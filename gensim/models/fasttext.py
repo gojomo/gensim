@@ -855,9 +855,9 @@ class FastText(BaseWordEmbeddingsModel):
             model = super(FastText, cls).load(*args, **kwargs)
 
             if not hasattr(model.trainables, 'vectors_vocab_lockf') and hasattr(model.wv, 'vectors_vocab'):
-                model.trainables.vectors_vocab_lockf = ones(model.wv.vectors_vocab.shape, dtype=REAL)
+                model.trainables.vectors_vocab_lockf = ones(len(model.wv.vectors_vocab), dtype=REAL)
             if not hasattr(model.trainables, 'vectors_ngrams_lockf') and hasattr(model.wv, 'vectors_ngrams'):
-                model.trainables.vectors_ngrams_lockf = ones(model.wv.vectors_ngrams.shape, dtype=REAL)
+                model.trainables.vectors_ngrams_lockf = ones(len(model.wv.vectors_ngrams), dtype=REAL)
 
             if not hasattr(model.wv, 'bucket'):
                 model.wv.bucket = model.trainables.bucket
@@ -971,8 +971,8 @@ class FastTextTrainables(Word2VecTrainables):
         assert num_vectors > 0, 'expected num_vectors to be initialized already'
         assert vocab_size > 0, 'expected vocab_size to be initialized already'
 
-        self.vectors_ngrams_lockf = ones(model.wv.vectors_ngrams.shape, dtype=REAL)
-        self.vectors_vocab_lockf = ones(model.wv.vectors_vocab.shape, dtype=REAL)
+        self.vectors_ngrams_lockf = ones(len(model.wv.vectors_ngrams), dtype=REAL)
+        self.vectors_vocab_lockf = ones(len(model.wv.vectors_vocab.shape), dtype=REAL)
 
         if model.hs:
             self.syn1 = hidden_output
