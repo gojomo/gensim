@@ -237,13 +237,13 @@ class PoincareModel(utils.SaveLoad):
     def _init_embeddings(self):
         """Randomly initialize vectors for the items in the vocab."""
         shape = (len(self.kv.index2word), self.size)
-        self.kv.syn0 = self._np_random.uniform(self.init_range[0], self.init_range[1], shape).astype(self.dtype)
+        self.kv.vectors = self._np_random.uniform(self.init_range[0], self.init_range[1], shape).astype(self.dtype)
 
     def _update_embeddings(self, old_index2word_len):
         """Randomly initialize vectors for the items in the additional vocab."""
         shape = (len(self.kv.index2word) - old_index2word_len, self.size)
         v = self._np_random.uniform(self.init_range[0], self.init_range[1], shape).astype(self.dtype)
-        self.kv.syn0 = np.concatenate([self.kv.syn0, v])
+        self.kv.vectors = np.concatenate([self.kv.vectors, v])
 
     def _init_node_probabilities(self):
         """Initialize a-priori probabilities."""
@@ -460,8 +460,8 @@ class PoincareModel(utils.SaveLoad):
             indices_v.append(v)
             indices_v.extend(negatives)
 
-        vectors_u = self.kv.syn0[indices_u]
-        vectors_v = self.kv.syn0[indices_v].reshape((batch_size, 1 + self.negative, self.size))
+        vectors_u = self.kv.vectors[indices_u]
+        vectors_v = self.kv.vectors[indices_v].reshape((batch_size, 1 + self.negative, self.size))
         vectors_v = vectors_v.swapaxes(0, 1).swapaxes(1, 2)
         batch = PoincareBatch(vectors_u, vectors_v, indices_u, indices_v, self.regularization_coeff)
         batch.compute_all()
@@ -498,7 +498,7 @@ class PoincareModel(utils.SaveLoad):
         for i, (relation, negatives) in enumerate(zip(relations, all_negatives)):
             u, v = relation
             auto_gradients = self._loss_grad(
-                np.vstack((self.kv.syn0[u], self.kv.syn0[[v] + negatives])), self.regularization_coeff)
+                np.vstack((self.kv.vectors[u], self.kv.vectors[[v] + negatives])), self.regularization_coeff)
             computed_gradients = np.vstack((batch.gradients_u[:, i], batch.gradients_v[:, :, i]))
             diff = np.abs(auto_gradients - computed_gradients).max()
             if diff > max_diff:
@@ -593,16 +593,16 @@ class PoincareModel(utils.SaveLoad):
         u_updates = (self.alpha * (batch.alpha ** 2) / 4 * grad_u).T
         self._handle_duplicates(u_updates, indices_u)
 
-        self.kv.syn0[indices_u] -= u_updates
-        self.kv.syn0[indices_u] = self._clip_vectors(self.kv.syn0[indices_u], self.epsilon)
+        self.kv.vectors[indices_u] -= u_updates
+        self.kv.vectors[indices_u] = self._clip_vectors(self.kv.vectors[indices_u], self.epsilon)
 
         v_updates = self.alpha * (batch.beta ** 2)[:, np.newaxis] / 4 * grad_v
         v_updates = v_updates.swapaxes(1, 2).swapaxes(0, 1)
         v_updates = v_updates.reshape(((1 + self.negative) * batch_size, self.size))
         self._handle_duplicates(v_updates, indices_v)
 
-        self.kv.syn0[indices_v] -= v_updates
-        self.kv.syn0[indices_v] = self._clip_vectors(self.kv.syn0[indices_v], self.epsilon)
+        self.kv.vectors[indices_v] -= v_updates
+        self.kv.vectors[indices_v] = self._clip_vectors(self.kv.vectors[indices_v], self.epsilon)
 
     def train(self, epochs, batch_size=10, print_every=1000, check_gradients_every=None):
         """Train Poincare embeddings using loaded data and model parameters.
@@ -948,7 +948,7 @@ class PoincareKeyedVectors(KeyedVectors):
 
         """
         all_distances = self.distances(node)
-        all_norms = np.linalg.norm(self.syn0, axis=1)
+        all_norms = np.linalg.norm(self.vectors, axis=1)
         node_norm = all_norms[self.vocab[node].index]
         mask = node_norm >= all_norms
         if mask.all():  # No nodes lower in the hierarchy
@@ -973,7 +973,7 @@ class PoincareKeyedVectors(KeyedVectors):
 
         """
         all_distances = self.distances(node)
-        all_norms = np.linalg.norm(self.syn0, axis=1)
+        all_norms = np.linalg.norm(self.vectors, axis=1)
         node_norm = all_norms[self.vocab[node].index]
         mask = node_norm <= all_norms
         if mask.all():  # No nodes higher in the hierarchy
@@ -1217,10 +1217,10 @@ class PoincareKeyedVectors(KeyedVectors):
         else:
             input_vector = node_or_vector
         if not other_nodes:
-            other_vectors = self.syn0
+            other_vectors = self.vectors
         else:
             other_indices = [self.vocab[node].index for node in other_nodes]
-            other_vectors = self.syn0[other_indices]
+            other_vectors = self.vectors[other_indices]
         return self.vector_distance_batch(input_vector, other_vectors)
 
     def norm(self, node_or_vector):
