@@ -41,7 +41,6 @@ from six import itervalues, string_types
 from gensim import matutils
 from numpy import float32 as REAL, ones, random, dtype
 from types import GeneratorType
-from gensim.utils import deprecated
 import os
 import copy
 
@@ -1257,88 +1256,3 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
             "training on a %i raw words (%i effective words) took %.1fs, %.0f effective words/s",
             raw_word_count, trained_word_count, total_elapsed, trained_word_count / total_elapsed
         )
-
-    # for backward compatibility
-    @deprecated("Method will be removed in 4.0.0, use self.wv.most_similar() instead")
-    def most_similar(self, positive=None, negative=None, topn=10, restrict_vocab=None, indexer=None):
-        """Deprecated, use self.wv.most_similar() instead.
-
-        Refer to the documentation for :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.most_similar`.
-
-        """
-        return self.wv.most_similar(positive, negative, topn, restrict_vocab, indexer)
-
-    @deprecated("Method will be removed in 4.0.0, use self.wv.wmdistance() instead")
-    def wmdistance(self, document1, document2):
-        """Deprecated, use self.wv.wmdistance() instead.
-
-        Refer to the documentation for :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.wmdistance`.
-
-        """
-        return self.wv.wmdistance(document1, document2)
-
-    @deprecated("Method will be removed in 4.0.0, use self.wv.most_similar_cosmul() instead")
-    def most_similar_cosmul(self, positive=None, negative=None, topn=10):
-        """Deprecated, use self.wv.most_similar_cosmul() instead.
-
-        Refer to the documentation for
-        :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.most_similar_cosmul`.
-
-        """
-        return self.wv.most_similar_cosmul(positive, negative, topn)
-
-    @deprecated("Method will be removed in 4.0.0, use self.wv.similar_by_word() instead")
-    def similar_by_word(self, word, topn=10, restrict_vocab=None):
-        """Deprecated, use self.wv.similar_by_word() instead.
-
-        Refer to the documentation for :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.similar_by_word`.
-
-        """
-        return self.wv.similar_by_word(word, topn, restrict_vocab)
-
-    @deprecated("Method will be removed in 4.0.0, use self.wv.similar_by_vector() instead")
-    def similar_by_vector(self, vector, topn=10, restrict_vocab=None):
-        """Deprecated, use self.wv.similar_by_vector() instead.
-
-        Refer to the documentation for :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.similar_by_vector`.
-
-        """
-        return self.wv.similar_by_vector(vector, topn, restrict_vocab)
-
-    @deprecated("Method will be removed in 4.0.0, use self.wv.doesnt_match() instead")
-    def doesnt_match(self, words):
-        """Deprecated, use self.wv.doesnt_match() instead.
-
-        Refer to the documentation for :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.doesnt_match`.
-
-        """
-        return self.wv.doesnt_match(words)
-
-    @deprecated("Method will be removed in 4.0.0, use self.wv.similarity() instead")
-    def similarity(self, w1, w2):
-        """Deprecated, use self.wv.similarity() instead.
-
-        Refer to the documentation for :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.similarity`.
-
-        """
-        return self.wv.similarity(w1, w2)
-
-    @deprecated("Method will be removed in 4.0.0, use self.wv.n_similarity() instead")
-    def n_similarity(self, ws1, ws2):
-        """Deprecated, use self.wv.n_similarity() instead.
-
-        Refer to the documentation for :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.n_similarity`.
-
-        """
-        return self.wv.n_similarity(ws1, ws2)
-
-    @deprecated("Method will be removed in 4.0.0, use self.wv.evaluate_word_pairs() instead")
-    def evaluate_word_pairs(self, pairs, delimiter='\t', restrict_vocab=300000,
-                            case_insensitive=True, dummy4unknown=False):
-        """Deprecated, use self.wv.evaluate_word_pairs() instead.
-
-        Refer to the documentation for
-        :meth:`~gensim.models.keyedvectors.WordEmbeddingsKeyedVectors.evaluate_word_pairs`.
-
-        """
-        return self.wv.evaluate_word_pairs(pairs, delimiter, restrict_vocab, case_insensitive, dummy4unknown)
