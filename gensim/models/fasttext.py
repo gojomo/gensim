@@ -262,7 +262,6 @@ The implementation is split across several submodules:
   and the trainables for FastText.
 - :mod:`gensim.models.base_any2vec`: Contains implementations for the base.
   classes, including functionality such as callbacks, logging.
-- :mod:`gensim.models.utils_any2vec`: Wrapper over Cython extensions.
 - :mod:`gensim.utils`: Implements model I/O (loading and saving).
 
 Our implementation relies heavily on inheritance.
@@ -290,7 +289,7 @@ from collections import Iterable
 import gensim.models._fasttext_bin
 
 from gensim.models.word2vec import Word2VecVocab, Word2VecTrainables
-from gensim.models.keyedvectors import KeyedVectors, _l2_norm, _save_word2vec_format
+from gensim.models.keyedvectors import KeyedVectors, _l2_norm
 from gensim.models.base_any2vec import BaseWordEmbeddingsModel
 from gensim.utils import deprecated, call_on_class_only, open, NO_CYTHON
 
@@ -579,8 +578,8 @@ class FastText(BaseWordEmbeddingsModel):
     def _clear_post_train(self):
         """Clear the model's internal structures after training has finished to free up RAM."""
         self.wv.vectors_norm = None
-        self.wv.vectors_vocab_norm = None
         self.wv.buckets_word = None
+        self.wv.adjust_vectors()  # ensure composite-word vecs reflect latest training
 
     def estimate_memory(self, vocab_size=None, report=None):
         vocab_size = vocab_size or len(self.wv.vocab)
@@ -829,7 +828,7 @@ class FastText(BaseWordEmbeddingsModel):
 
         """
         kwargs['ignore'] = kwargs.get(
-            'ignore', ['vectors_norm', 'vectors_vocab_norm', 'buckets_word'])
+            'ignore', ['vectors_norm', 'buckets_word'])
         super(FastText, self).save(*args, **kwargs)
 
     @classmethod
@@ -920,15 +919,13 @@ class FastTextTrainables(Word2VecTrainables):
         #   1. vectors_vocab_lockf
         #   2. vectors_ngrams_lockf
         #
-        # These are both 2D matrices of shapes equal to the shapes of
+        # These are both 1D matrices of shapes equal to the lengths of
         # wv.vectors_vocab and wv.vectors_ngrams. So, each row corresponds to
-        # a vector, and each column corresponds to a dimension within that
-        # vector.
+        # a vector.
         #
         # Lockf stands for "lock factor": zero values suppress learning, one
-        # values enable it. Interestingly, the vectors_vocab_lockf and
-        # vectors_ngrams_lockf seem to be used only by the C code in
-        # fasttext_inner.pyx.
+        # values enable it. The vectors_vocab_lockf and vectors_ngrams_lockf
+        # are used only by the Cython code in fasttext_inner.pyx.
         #
         # The word2vec implementation also uses vectors_lockf: in that case,
         # it's a 1D array, with a real number for each vector. The FastText
@@ -959,12 +956,12 @@ class FastTextTrainables(Word2VecTrainables):
         """
         if not update:
             wv.init_ngrams_weights(self.seed)
-            self.vectors_vocab_lockf = ones(wv.vectors_vocab.shape, dtype=REAL)
-            self.vectors_ngrams_lockf = ones(wv.vectors_ngrams.shape, dtype=REAL)
+            self.vectors_vocab_lockf = ones(len(wv.vectors_vocab), dtype=REAL)
+            self.vectors_ngrams_lockf = ones(len(wv.vectors_ngrams), dtype=REAL)
         else:
             wv.update_ngrams_weights(self.seed, vocabulary.old_vocab_len)
-            self.vectors_vocab_lockf = _pad_ones(self.vectors_vocab_lockf, wv.vectors_vocab.shape)
-            self.vectors_ngrams_lockf = _pad_ones(self.vectors_ngrams_lockf, wv.vectors_ngrams.shape)
+            self.vectors_vocab_lockf = _pad_ones(self.vectors_vocab_lockf, len(wv.vectors_vocab))
+            self.vectors_ngrams_lockf = _pad_ones(self.vectors_ngrams_lockf, len(wv.vectors_ngrams))
 
     def init_post_load(self, model, hidden_output):
         num_vectors = len(model.wv.vectors)
@@ -985,15 +982,12 @@ class FastTextTrainables(Word2VecTrainables):
         self.layer1_size = vector_size
 
 
-def _pad_ones(m, new_shape):
-    """Pad a matrix with additional rows filled with ones."""
-    assert m.shape[0] <= new_shape[0], 'the new number of rows must be greater'
-    assert m.shape[1] == new_shape[1], 'the number of columns must match'
-    new_rows = new_shape[0] - m.shape[0]
-    if new_rows == 0:
-        return m
-    suffix = ones((new_rows, m.shape[1]), dtype=REAL)
-    return vstack([m, suffix])
+def _pad_ones(m, new_len):
+    """Pad array with additional entries filled with ones."""
+    assert len(m) <= new_len, 'the new number of rows %i must be greater than old %i' % (new_len, len(m))
+    new_arr = np.ones(new_len, dtype=REAL)
+    new_arr[:len(m)] = m
+    return new_arr
 
 
 def load_facebook_model(path, encoding='utf-8'):
@@ -1291,9 +1285,11 @@ class FastTextKeyedVectors(KeyedVectors):
     ----------
     vectors_vocab : np.array
         Each row corresponds to a vector for an entity in the vocabulary.
-        Columns correspond to vector dimensions.
-    vectors_vocab_norm : np.array
-        Same as vectors_vocab, but the vectors are L2 normalized.
+        Columns correspond to vector dimensions. When embedded in a full
+        FastText model, these are the full-word-token vectors updated
+        by training, whereas the inherited vectors are the actual per-word
+        vectors synthesized from the full-word-token and all subword (ngram)
+        vectors.
     vectors_ngrams : np.array
         A vector for each ngram across all entities in the vocabulary.
         Each row is a vector that corresponds to a bucket.
@@ -1305,7 +1301,6 @@ class FastTextKeyedVectors(KeyedVectors):
     def __init__(self, vector_size, min_n, max_n, bucket, compatible_hash):
         super(FastTextKeyedVectors, self).__init__(vector_size=vector_size)
         self.vectors_vocab = None  # fka syn0_vocab
-        self.vectors_vocab_norm = None  # fka syn0_vocab_norm
         self.vectors_ngrams = None  # fka syn0_ngrams
         self.buckets_word = None
         self.min_n = min_n
@@ -1371,7 +1366,6 @@ class FastTextKeyedVectors(KeyedVectors):
         # don't bother storing the cached normalized vectors
         ignore_attrs = [
             'vectors_norm',
-            'vectors_vocab_norm',
             'buckets_word',
             'hash2index',
         ]
@@ -1426,27 +1420,6 @@ class FastTextKeyedVectors(KeyedVectors):
             else:
                 return word_vec
 
-
-    def save_word2vec_format(self, fname, fvocab=None, binary=False, total_vec=None):
-        """Store the input-hidden weight matrix in the same format used by the original
-        C word2vec-tool, for compatibility.
-
-        Parameters
-        ----------
-        fname : str
-            The file path used to save the vectors in
-        fvocab : str, optional
-            Optional file path used to save the vocabulary
-        binary : bool, optional
-            If True, the data wil be saved in binary word2vec format, else it will be saved in plain text.
-        total_vec : int, optional
-            Optional parameter to explicitly specify total no. of vectors
-            (in case word vectors are appended with document vectors afterwards).
-
-        """
-        # from gensim.models.word2vec import save_word2vec_format
-        _save_word2vec_format(
-            fname, self.vocab, self.vectors, fvocab=fvocab, binary=binary, total_vec=total_vec)
 
     def init_ngrams_weights(self, seed):
         """Initialize the vocabulary and ngrams weights prior to training.
@@ -1519,14 +1492,14 @@ class FastTextKeyedVectors(KeyedVectors):
         new_vocab = len(self.vocab) - old_vocab_len
         self.vectors_vocab = _pad_random(self.vectors_vocab, new_vocab, rand_obj)
 
-    def init_post_load(self, vectors):
+    def init_post_load(self, fb_vectors):
         """Perform initialization after loading a native Facebook model.
 
         Expects that the vocabulary (self.vocab) has already been initialized.
 
         Parameters
         ----------
-        vectors : np.array
+        fb_vectors : np.array
             A matrix containing vectors for all the entities, including words
             and ngrams.  This comes directly from the binary model.
             The order of the vectors must correspond to the indices in
@@ -1536,39 +1509,37 @@ class FastTextKeyedVectors(KeyedVectors):
 
         """
         vocab_words = len(self.vocab)
-        assert vectors.shape[0] == vocab_words + self.bucket, 'unexpected number of vectors'
-        assert vectors.shape[1] == self.vector_size, 'unexpected vector dimensionality'
+        assert fb_vectors.shape[0] == vocab_words + self.bucket, 'unexpected number of vectors'
+        assert fb_vectors.shape[1] == self.vector_size, 'unexpected vector dimensionality'
 
         #
         # The incoming vectors contain vectors for both words AND
         # ngrams.  We split them into two separate matrices, because our
         # implementation treats them differently.
         #
-        self.vectors = np.array(vectors[:vocab_words, :])
-        self.vectors_vocab = np.array(vectors[:vocab_words, :])
-        self.vectors_ngrams = np.array(vectors[vocab_words:, :])
+        self.vectors_vocab = np.array(fb_vectors[:vocab_words, :])
+        self.vectors_ngrams = np.array(fb_vectors[vocab_words:, :])
         self.buckets_word = None  # This can get initialized later
 
-        self.adjust_vectors()
+        self.adjust_vectors()  # calculate composite full-word vectors
 
     def adjust_vectors(self):
         """Adjust the vectors for words in the vocabulary.
 
-        The adjustment relies on the vectors of the ngrams making up each
-        individual word.
+        The adjustment composes the trained full-word-token vectors with
+        the vectors of the subword ngrams, matching the Facebook reference
+        implementation behavior.
 
         """
         if self.bucket == 0:
             return
 
-        for w, v in self.vocab.items():
-            word_vec = np.copy(self.vectors_vocab[v.index])
+        self.vectors = self.vectors_vocab[:].copy()
+        for i, w in enumerate(self.index2key):
             ngram_hashes = ft_ngram_hashes(w, self.min_n, self.max_n, self.bucket, self.compatible_hash)
             for nh in ngram_hashes:
-                word_vec += self.vectors_ngrams[nh]
-            word_vec /= len(ngram_hashes) + 1
-            self.vectors[v.index] = word_vec
-
+                self.vectors[i] += self.vectors_ngrams[nh]
+            self.vectors[i] /= len(ngram_hashes) + 1
 
 
 def _process_fasttext_vocab(iterable, min_n, max_n, num_buckets, compatible_hash):
