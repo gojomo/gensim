@@ -708,7 +708,10 @@ class TestFastTextModel(unittest.TestCase):
                 others.append(l)
         self.assertTrue(all('terrorism' not in l for l in others))
         model.build_vocab(others)
+        start_vecs = model.wv.vectors_vocab.copy()
         model.train(others, total_examples=model.corpus_count, epochs=model.epochs)
+        # checks that `vectors_vocab` has been changed by training
+        self.assertFalse(np.all(np.equal(start_vecs, model.wv.vectors_vocab)))
         # checks that `vectors` is different from `vectors_vocab`
         self.assertFalse(np.all(np.equal(model.wv.vectors, model.wv.vectors_vocab)))
         self.assertFalse('terrorism' in model.wv.vocab)
