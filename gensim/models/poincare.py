@@ -886,6 +886,11 @@ class PoincareKeyedVectors(KeyedVectors):
         super(PoincareKeyedVectors, self).__init__(vector_size)
         self.max_distance = 0
 
+    def _load_specials(self, *args, **kwargs):
+        super(PoincareKeyedVectors, self)._load_specials(*args, **kwargs)
+        # fixup rename of syn0
+        if not hasattr(self, 'vectors'):
+            self.vectors = self.__dict__.pop('syn0')
 
     @staticmethod
     def vector_distance(vector_1, vector_2):
