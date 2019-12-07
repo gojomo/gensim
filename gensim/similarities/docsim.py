@@ -1052,7 +1052,7 @@ class WmdSimilarity(interfaces.SimilarityABC):
 
         if normalize_w2v_and_replace:
             # Normalize vectors in word2vec class to length 1.
-            w2v_model.init_sims(replace=True)
+            w2v_model.wv.init_sims(replace=True)
 
     def __len__(self):
         """Get size of corpus."""
