@@ -289,7 +289,7 @@ from collections.abc import Iterable
 import gensim.models._fasttext_bin
 
 from gensim.models.word2vec import Word2VecVocab, Word2VecTrainables
-from gensim.models.keyedvectors import KeyedVectors, _l2_norm
+from gensim.models.keyedvectors import KeyedVectors
 from gensim.models.base_any2vec import BaseWordEmbeddingsModel
 from gensim import utils
 from gensim.utils import deprecated, call_on_class_only
@@ -858,6 +858,12 @@ class FastText(BaseWordEmbeddingsModel):
                 model.trainables.vectors_vocab_lockf = ones(len(model.wv.vectors_vocab), dtype=REAL)
             if not hasattr(model.trainables, 'vectors_ngrams_lockf') and hasattr(model.wv, 'vectors_ngrams'):
                 model.trainables.vectors_ngrams_lockf = ones(len(model.wv.vectors_ngrams), dtype=REAL)
+
+            # fixup mistakenly overdimensioned gensim-3.x lockf arrays
+            if len(model.trainables.vectors_vocab_lockf.shape) > 1:
+                model.trainables.vectors_vocab_lockf = model.trainables.vectors_vocab_lockf[:,0]
+            if len(model.trainables.vectors_ngrams_lockf.shape) > 1:
+                model.trainables.vectors_ngrams_lockf = model.trainables.vectors_ngrams_lockf[:,0]
 
             if not hasattr(model.wv, 'bucket'):
                 model.wv.bucket = model.trainables.bucket
@@ -1554,7 +1560,6 @@ def _pad_random(m, new_rows, rand):
     low, high = -1.0 / columns, 1.0 / columns
     suffix = rand.uniform(low, high, (new_rows, columns)).astype(REAL)
     return vstack([m, suffix])
-
 
 
 def _rollback_optimization(kv):
