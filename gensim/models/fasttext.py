@@ -1753,6 +1753,6 @@ def ft_ngram_hashes(word, minn, maxn, num_buckets, fb_compatible=True):
 
 
 # BACKWARD COMPATIBILITY FOR OLDER PICKLES
-import gensim.models.keyedvectors as keyedvectors
+from gensim.models import keyedvectors
 keyedvectors.FastTextKeyedVectors = FastTextKeyedVectors
 >>>>>>> dbc96918... mv FT code to fasttext.py; rm expired deprecations
