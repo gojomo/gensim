@@ -553,7 +553,7 @@ class TestWord2VecAnnoyIndexer(unittest.TestCase):
 
     def testWord2Vec(self):
         model = word2vec.Word2Vec(texts, min_count=1)
-        model.init_sims()
+        model.wv.init_sims()
         index = self.indexer(model, 10)
 
         self.assertVectorIsSimilarToItself(model.wv, index)
@@ -716,7 +716,7 @@ class TestWord2VecNmslibIndexer(unittest.TestCase):
 
     def test_word2vec(self):
         model = word2vec.Word2Vec(texts, min_count=1)
-        model.init_sims()
+        model.wv.init_sims()
         index = self.indexer(model)
 
         self.assertVectorIsSimilarToItself(model.wv, index)
@@ -735,11 +735,11 @@ class TestWord2VecNmslibIndexer(unittest.TestCase):
                         yield line.lower().strip().split()
 
         model = FastText(LeeReader(datapath('lee.cor')))
-        model.init_sims()
+        model.wv.init_sims()
         index = self.indexer(model)
 
         self.assertVectorIsSimilarToItself(model.wv, index)
-        self.assertApproxNeighborsMatchExact(model, model.wv, index)
+        self.assertApproxNeighborsMatchExact(model.wv, model.wv, index)
         self.assertIndexSaved(index)
         self.assertLoadedIndexEqual(index, model)
 
@@ -807,7 +807,7 @@ class TestDoc2VecNmslibIndexer(unittest.TestCase):
         from gensim.similarities.nmslib import NmslibIndexer
 
         self.model = doc2vec.Doc2Vec(sentences, min_count=1)
-        self.model.init_sims()
+        self.model.docvecs.init_sims()
         self.index = NmslibIndexer(self.model)
         self.vector = self.model.docvecs.vectors_docs_norm[0]
 
