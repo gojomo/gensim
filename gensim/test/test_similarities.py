@@ -720,7 +720,7 @@ class TestWord2VecNmslibIndexer(unittest.TestCase):
         index = self.indexer(model)
 
         self.assertVectorIsSimilarToItself(model.wv, index)
-        self.assertApproxNeighborsMatchExact(model, model.wv, index)
+        self.assertApproxNeighborsMatchExact(model.wv, model.wv, index)
         self.assertIndexSaved(index)
         self.assertLoadedIndexEqual(index, model)
 
