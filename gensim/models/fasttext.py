@@ -483,7 +483,6 @@ class FastText(BaseWordEmbeddingsModel):
             callbacks=callbacks, batch_words=batch_words, trim_rule=trim_rule, sg=sg, alpha=alpha, window=window,
             seed=seed, hs=hs, negative=negative, cbow_mean=cbow_mean, min_alpha=min_alpha)
 
-
     def build_vocab(self, sentences=None, corpus_file=None, update=False, progress_per=10000, keep_raw_vocab=False,
                     trim_rule=None, **kwargs):
         """Build vocabulary from a sequence of sentences (can be a once-only generator stream).
@@ -861,9 +860,9 @@ class FastText(BaseWordEmbeddingsModel):
 
             # fixup mistakenly overdimensioned gensim-3.x lockf arrays
             if len(model.trainables.vectors_vocab_lockf.shape) > 1:
-                model.trainables.vectors_vocab_lockf = model.trainables.vectors_vocab_lockf[:,0]
+                model.trainables.vectors_vocab_lockf = model.trainables.vectors_vocab_lockf[:, 0]
             if len(model.trainables.vectors_ngrams_lockf.shape) > 1:
-                model.trainables.vectors_ngrams_lockf = model.trainables.vectors_ngrams_lockf[:,0]
+                model.trainables.vectors_ngrams_lockf = model.trainables.vectors_ngrams_lockf[:, 0]
 
             if not hasattr(model.wv, 'bucket'):
                 model.wv.bucket = model.trainables.bucket
@@ -1426,7 +1425,6 @@ class FastTextKeyedVectors(KeyedVectors):
             else:
                 return word_vec
 
-
     def init_ngrams_weights(self, seed):
         """Initialize the vocabulary and ngrams weights prior to training.
 
@@ -1735,6 +1733,7 @@ def _try_upgrade(wv):
         )
         wv.compatible_hash = False
 
+
 #
 # UTF-8 bytes that begin with 10 are subsequent bytes of a multi-byte sequence,
 # as opposed to a new character.
@@ -1790,5 +1789,5 @@ def ft_ngram_hashes(word, minn, maxn, num_buckets, fb_compatible=True):
 
 
 # BACKWARD COMPATIBILITY FOR OLDER PICKLES
-from gensim.models import keyedvectors
+from gensim.models import keyedvectors  # noqa: E402
 keyedvectors.FastTextKeyedVectors = FastTextKeyedVectors

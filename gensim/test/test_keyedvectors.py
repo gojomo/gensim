@@ -14,8 +14,7 @@ import unittest
 
 import numpy as np
 
-from gensim.corpora import Dictionary
-from gensim.models.keyedvectors import KeyedVectors, FastTextKeyedVectors
+from gensim.models.keyedvectors import KeyedVectors
 from gensim.test.utils import datapath
 
 import gensim.models.keyedvectors

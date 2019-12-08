@@ -178,7 +178,6 @@ from gensim.corpora.dictionary import Dictionary
 from six import string_types, integer_types, iteritems
 from six.moves import zip, range
 from scipy import stats
-from gensim.utils import deprecated
 
 # For backwards compatibility, see https://github.com/RaRe-Technologies/gensim/issues/2201
 #
@@ -200,9 +199,6 @@ class KeyedVectors(utils.SaveLoad):
         self.vocab = {}
         self.vector_size = vector_size
         self.index2key = []  # fka index2entity or index2word
-
-    def save(self, fname_or_handle, **kwargs):
-        super(KeyedVectors, self).save(fname_or_handle, **kwargs)
 
     @classmethod
     def load(cls, fname_or_handle, **kwargs):
@@ -352,7 +348,7 @@ class KeyedVectors(utils.SaveLoad):
         """Rank of the distance of `entity2` from `entity1`, in relation to distances of all entities from `entity1`."""
         return len(self.closer_than(entity1, entity2)) + 1
 
-    ## backward compatibility
+    # backward compatibility
     @property
     def index2entity(self):
         return self.index2key
@@ -519,7 +515,6 @@ class KeyedVectors(utils.SaveLoad):
 
         """
         return self.most_similar(positive=[vector], topn=topn, restrict_vocab=restrict_vocab)
-
 
     def wmdistance(self, document1, document2):
         """Compute the Word Mover's Distance between two documents.
@@ -1243,8 +1238,10 @@ class KeyedVectors(utils.SaveLoad):
         )
         return layer
 
+
 # to help 3.8.1 & older pickles load properly
 Word2VecKeyedVectors = KeyedVectors
+
 
 class Doc2VecKeyedVectors(KeyedVectors):
 
@@ -1666,7 +1663,6 @@ class Vocab(object):
     def __str__(self):
         vals = ['%s:%r' % (key, self.__dict__[key]) for key in sorted(self.__dict__) if not key.startswith('_')]
         return "%s(%s)" % (self.__class__.__name__, ', '.join(vals))
-
 
 
 def _save_word2vec_format(fname, vocab, vectors, fvocab=None, binary=False, total_vec=None):

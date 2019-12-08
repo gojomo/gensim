@@ -23,6 +23,7 @@ from gensim.models.keyedvectors import KeyedVectors
 from gensim.test.utils import datapath, get_tmpfile, temporary_file, common_texts as sentences
 import gensim.models._fasttext_bin
 from gensim.models.fasttext_inner import compute_ngrams, compute_ngrams_bytes, ft_hash_broken, ft_hash_bytes
+from gensim.models.fasttext import _unpack, _unpack_copy
 
 import gensim.models.fasttext
 
@@ -1164,7 +1165,7 @@ class HashCompatibilityTest(unittest.TestCase):
         self.assertEqual(m.trainables.bucket, m.wv.bucket)
 
 
-class HashTest(unittest.TestCase):
+class FTHashResultsTest(unittest.TestCase):
     """Loosely based on the test described here:
 
     https://github.com/RaRe-Technologies/gensim/issues/2059#issuecomment-432300777
@@ -1228,7 +1229,7 @@ def hash_main(alg):
             print('u%r: %r,' % (word, fun(word)))
 
 
-class HashTest(unittest.TestCase):
+class FTHashFunctionsTest(unittest.TestCase):
     def setUp(self):
         #
         # I obtained these expected values using:
@@ -1760,8 +1761,6 @@ class TestFastTextKeyedVectors(unittest.TestCase):
 
         self.assertEqual(actual, expected)
 
-
-from gensim.models.fasttext import _unpack, _unpack_copy
 
 class UnpackTest(unittest.TestCase):
     def test_copy_sanity(self):
