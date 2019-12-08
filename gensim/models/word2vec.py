@@ -147,7 +147,6 @@ from numpy import exp, dot, zeros, random, dtype, float32 as REAL,\
 from scipy.special import expit
 
 from gensim import utils, matutils  # utility fnc for pickling, common scipy operations etc
-from gensim.utils import deprecated
 from six import iteritems, itervalues, string_types
 from six.moves import range
 
@@ -1003,7 +1002,6 @@ class Word2Vec(BaseWordEmbeddingsModel):
             self.__class__.__name__, len(self.wv.index2key), self.wv.vector_size, self.alpha
         )
 
-
     def save(self, *args, **kwargs):
         """Save the model.
         This saved model can be loaded again using :func:`~gensim.models.word2vec.Word2Vec.load`, which supports
@@ -1029,7 +1027,6 @@ class Word2Vec(BaseWordEmbeddingsModel):
 
         """
         return self.running_training_loss
-
 
     @classmethod
     def load(cls, *args, **kwargs):

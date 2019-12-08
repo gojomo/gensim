@@ -753,7 +753,6 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
                     "and is not stored as part of the model. Model initialized without sentences. "
                     "trim_rule provided, if any, will be ignored.")
 
-
     def __str__(self):
         """Get a human readable representation of the object.
 
