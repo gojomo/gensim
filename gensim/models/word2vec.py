@@ -964,7 +964,7 @@ class Word2Vec(BaseWordEmbeddingsModel):
         prob_values /= sum(prob_values)
         top_indices = matutils.argsort(prob_values, topn=topn, reverse=True)
         # returning the most probable output words with their probabilities
-        return [(self.wv.index2word[index1], prob_values[index1]) for index1 in top_indices]
+        return [(self.wv.index2key[index1], prob_values[index1]) for index1 in top_indices]
 
     def reset_from(self, other_model):
         """Borrow shareable pre-built structures from `other_model` and reset hidden layer weights.
@@ -984,7 +984,7 @@ class Word2Vec(BaseWordEmbeddingsModel):
 
         """
         self.wv.vocab = other_model.wv.vocab
-        self.wv.index2word = other_model.wv.index2word
+        self.wv.index2key = other_model.wv.index2key
         self.vocabulary.cum_table = other_model.vocabulary.cum_table
         self.corpus_count = other_model.corpus_count
         self.trainables.reset_weights(self.hs, self.negative, self.wv)
@@ -1000,7 +1000,7 @@ class Word2Vec(BaseWordEmbeddingsModel):
 
         """
         return "%s(vocab=%s, size=%s, alpha=%s)" % (
-            self.__class__.__name__, len(self.wv.index2word), self.wv.vector_size, self.alpha
+            self.__class__.__name__, len(self.wv.index2key), self.wv.vector_size, self.alpha
         )
 
 
@@ -1327,8 +1327,8 @@ class Word2VecVocab(utils.SaveLoad):
         """Sort the vocabulary so the most frequent words have the lowest indexes."""
         if len(wv.vectors):
             raise RuntimeError("cannot sort vocabulary after model weights already initialized.")
-        wv.index2word.sort(key=lambda word: wv.vocab[word].count, reverse=True)
-        for i, word in enumerate(wv.index2word):
+        wv.index2key.sort(key=lambda word: wv.vocab[word].count, reverse=True)
+        for i, word in enumerate(wv.index2key):
             wv.vocab[word].index = i
 
     def prepare_vocab(
@@ -1373,7 +1373,7 @@ class Word2VecVocab(utils.SaveLoad):
             retain_total, retain_words = 0, []
             # Discard words less-frequent than min_count
             if not dry_run:
-                wv.index2word = []
+                wv.index2key = []
                 # make stored settings match these applied settings
                 self.min_count = min_count
                 self.sample = sample
@@ -1384,8 +1384,8 @@ class Word2VecVocab(utils.SaveLoad):
                     retain_words.append(word)
                     retain_total += v
                     if not dry_run:
-                        wv.vocab[word] = Vocab(count=v, index=len(wv.index2word))
-                        wv.index2word.append(word)
+                        wv.vocab[word] = Vocab(count=v, index=len(wv.index2key))
+                        wv.index2key.append(word)
                 else:
                     drop_unique += 1
                     drop_total += v
@@ -1416,8 +1416,8 @@ class Word2VecVocab(utils.SaveLoad):
                         new_words.append(word)
                         new_total += v
                         if not dry_run:
-                            wv.vocab[word] = Vocab(count=v, index=len(wv.index2word))
-                            wv.index2word.append(word)
+                            wv.vocab[word] = Vocab(count=v, index=len(wv.index2key))
+                            wv.index2key.append(word)
                 else:
                     drop_unique += 1
                     drop_total += v
@@ -1492,7 +1492,7 @@ class Word2VecVocab(utils.SaveLoad):
     def add_null_word(self, wv):
         word, v = '\0', Vocab(count=1, sample_int=0)
         v.index = len(wv.vocab)
-        wv.index2word.append(word)
+        wv.index2key.append(word)
         wv.vocab[word] = v
 
     def create_binary_tree(self, wv):
@@ -1514,15 +1514,15 @@ class Word2VecVocab(utils.SaveLoad):
         Called internally from :meth:`~gensim.models.word2vec.Word2VecVocab.build_vocab`.
 
         """
-        vocab_size = len(wv.index2word)
+        vocab_size = len(wv.index2key)
         self.cum_table = zeros(vocab_size, dtype=uint32)
         # compute sum of all power (Z in paper)
         train_words_pow = 0.0
         for word_index in range(vocab_size):
-            train_words_pow += wv.vocab[wv.index2word[word_index]].count**self.ns_exponent
+            train_words_pow += wv.vocab[wv.index2key[word_index]].count**self.ns_exponent
         cumulative = 0.0
         for word_index in range(vocab_size):
-            cumulative += wv.vocab[wv.index2word[word_index]].count**self.ns_exponent
+            cumulative += wv.vocab[wv.index2key[word_index]].count**self.ns_exponent
             self.cum_table[word_index] = round(cumulative / train_words_pow * domain)
         if len(self.cum_table) > 0:
             assert self.cum_table[-1] == domain
@@ -1615,7 +1615,7 @@ class Word2VecTrainables(utils.SaveLoad):
         # randomize weights vector by vector, rather than materializing a huge random matrix in RAM at once
         for i in range(len(wv.vocab)):
             # construct deterministic seed from word AND seed argument
-            wv.vectors[i] = self.seeded_vector(wv.index2word[i] + str(self.seed), wv.vector_size)
+            wv.vectors[i] = self.seeded_vector(wv.index2key[i] + str(self.seed), wv.vector_size)
         if hs:
             self.syn1 = zeros((len(wv.vocab), self.layer1_size), dtype=REAL)
         if negative:
@@ -1633,7 +1633,7 @@ class Word2VecTrainables(utils.SaveLoad):
         # randomize the remaining words
         for i in range(len(wv.vectors), len(wv.vocab)):
             # construct deterministic seed from word AND seed argument
-            newvectors[i - len(wv.vectors)] = self.seeded_vector(wv.index2word[i] + str(self.seed), wv.vector_size)
+            newvectors[i - len(wv.vectors)] = self.seeded_vector(wv.index2key[i] + str(self.seed), wv.vector_size)
 
         # Raise an error if an online update is run before initial training on a corpus
         if not len(wv.vectors):

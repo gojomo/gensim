@@ -376,7 +376,7 @@ class Doc2Vec(BaseWordEmbeddingsModel):
 
         """
         self.wv.vocab = other_model.wv.vocab
-        self.wv.index2word = other_model.wv.index2word
+        self.wv.index2key = other_model.wv.index2key
         self.vocabulary.cum_table = other_model.vocabulary.cum_table
         self.corpus_count = other_model.corpus_count
         self.docvecs.count = other_model.docvecs.count
