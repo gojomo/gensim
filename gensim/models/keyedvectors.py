@@ -260,8 +260,8 @@ class KeyedVectors(utils.SaveLoad):
 
     def get_index(self, key):
         """TODO comment"""
-        if key in self.vocab:
-            return self.vocab[key].index
+        if key in self.map:
+            return self.map[key].index
         elif isinstance(key, (integer_types, np.integer)) and key < len(self.vectors):
             return key
         else:
@@ -289,7 +289,6 @@ class KeyedVectors(utils.SaveLoad):
 
         """
         index = self.get_index(key)
-
         if use_norm:
             result = self.vectors_norm[index]
         else:
@@ -1332,7 +1331,12 @@ class KeyedVectors(utils.SaveLoad):
         return layer
 
     def _upconvert_old_d2vkv(self):
+        from gensim.models.doc2vec import Doctag
         self.vocab = self.doctags
+        for k in self.vocab.keys():
+            v = self.vocab[k]
+            if hasattr(v, 'offset'):
+                self.vocab[k] = Doctag(v.offset + self.max_rawint + 1, v.word_count, v.doc_count)
         if(self.max_rawint > -1):
             self.index2key = ConcatList([range(0, self.max_rawint + 1), self.offset2doctag])
         self.vectors = self.vectors_docs
