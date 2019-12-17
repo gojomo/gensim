@@ -256,21 +256,21 @@ Copyright (c) 2009-now Radim Rehurek
 
 distributed_env = ['Pyro4 >= 4.27']
 
-win_testenv = [
+linux_testenv = [
     'pytest',
     'pytest-rerunfailures',
     'mock',
     'cython',
-    # temporarily remove pyemd to work around appveyor issues
-    # 'pyemd',
     'testfixtures',
     'Morfessor==2.0.2a4',
     'python-Levenshtein >= 0.10.2',
     'visdom >= 0.1.8, != 0.1.8.7',
     'scikit-learn',
+    'pyemd',  # see below; keep as last until appveyor issue resolved
 ]
 
-linux_testenv = win_testenv[:]
+# temporarily remove pyemd to work around appveyor issues
+win_testenv = linux_testenv[:-1]
 
 #
 # This list partially duplicates requirements_docs.txt.
