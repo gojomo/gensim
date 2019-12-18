@@ -94,7 +94,6 @@ class BaseAny2VecModel(utils.SaveLoad):
         self.total_train_time = 0
         self.batch_words = batch_words
         self.model_trimmed_post_training = False
-        self.callbacks = callbacks
 
     def _get_job_params(self, cur_epoch):
         """Get job parameters required for each batch."""
@@ -193,6 +192,7 @@ class BaseAny2VecModel(utils.SaveLoad):
         """
         thread_private_mem = self._get_thread_working_mem()
         jobs_processed = 0
+        callbacks = progress_queue.callbacks
         while True:
             job = job_queue.get()
             if job is None:
@@ -200,12 +200,12 @@ class BaseAny2VecModel(utils.SaveLoad):
                 break  # no more jobs => quit this worker
             data_iterable, job_parameters = job
 
-            for callback in self.callbacks:
+            for callback in callbacks:
                 callback.on_batch_begin(self)
 
             tally, raw_tally = self._do_train_job(data_iterable, job_parameters, thread_private_mem)
 
-            for callback in self.callbacks:
+            for callback in callbacks:
                 callback.on_batch_end(self)
 
             progress_queue.put((len(data_iterable), tally, raw_tally))  # report back progress
@@ -366,7 +366,8 @@ class BaseAny2VecModel(utils.SaveLoad):
         self.total_train_time += elapsed
         return trained_word_count, raw_word_count, job_tally
 
-    def _train_epoch_corpusfile(self, corpus_file, cur_epoch=0, total_examples=None, total_words=None, **kwargs):
+    def _train_epoch_corpusfile(
+        self, corpus_file, cur_epoch=0, total_examples=None, total_words=None, callbacks=(), **kwargs):
         """Train the model for a single epoch.
 
         Parameters
@@ -430,7 +431,7 @@ class BaseAny2VecModel(utils.SaveLoad):
         return trained_word_count, raw_word_count, job_tally
 
     def _train_epoch(self, data_iterable, cur_epoch=0, total_examples=None, total_words=None,
-                     queue_factor=2, report_delay=1.0):
+                     queue_factor=2, report_delay=1.0, callbacks=()):
         """Train the model for a single epoch.
 
         Parameters
@@ -462,6 +463,7 @@ class BaseAny2VecModel(utils.SaveLoad):
         """
         job_queue = Queue(maxsize=queue_factor * self.workers)
         progress_queue = Queue(maxsize=(queue_factor + 1) * self.workers)
+        progress_queue.callbacks = callbacks  # messy way to pass along for just this session
 
         workers = [
             threading.Thread(
@@ -522,15 +524,13 @@ class BaseAny2VecModel(utils.SaveLoad):
 
         """
         self._set_train_params(**kwargs)
-        if callbacks:
-            self.callbacks = callbacks
         self.epochs = epochs
         self._check_training_sanity(
             epochs=epochs,
             total_examples=total_examples,
             total_words=total_words, **kwargs)
 
-        for callback in self.callbacks:
+        for callback in callbacks:
             callback.on_train_begin(self)
 
         trained_word_count = 0
@@ -539,22 +539,24 @@ class BaseAny2VecModel(utils.SaveLoad):
         job_tally = 0
 
         for cur_epoch in range(self.epochs):
-            for callback in self.callbacks:
+            for callback in callbacks:
                 callback.on_epoch_begin(self)
 
             if data_iterable is not None:
                 trained_word_count_epoch, raw_word_count_epoch, job_tally_epoch = self._train_epoch(
                     data_iterable, cur_epoch=cur_epoch, total_examples=total_examples,
-                    total_words=total_words, queue_factor=queue_factor, report_delay=report_delay)
+                    total_words=total_words, queue_factor=queue_factor, report_delay=report_delay,
+                    callbacks=callbacks)
             else:
                 trained_word_count_epoch, raw_word_count_epoch, job_tally_epoch = self._train_epoch_corpusfile(
-                    corpus_file, cur_epoch=cur_epoch, total_examples=total_examples, total_words=total_words, **kwargs)
+                    corpus_file, cur_epoch=cur_epoch, total_examples=total_examples, total_words=total_words,
+                    callbacks=callbacks, **kwargs)
 
             trained_word_count += trained_word_count_epoch
             raw_word_count += raw_word_count_epoch
             job_tally += job_tally_epoch
 
-            for callback in self.callbacks:
+            for callback in callbacks:
                 callback.on_epoch_end(self)
 
         # Log overall time
@@ -564,7 +566,7 @@ class BaseAny2VecModel(utils.SaveLoad):
         self.train_count += 1  # number of times train() has been called
         self._clear_post_train()
 
-        for callback in self.callbacks:
+        for callback in callbacks:
             callback.on_train_end(self)
         return trained_word_count, raw_word_count
 
@@ -730,13 +732,19 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
             self.train(
                 sentences=sentences, corpus_file=corpus_file, total_examples=self.corpus_count,
                 total_words=self.corpus_total_words, epochs=self.epochs, start_alpha=self.alpha,
-                end_alpha=self.min_alpha, compute_loss=compute_loss)
+                end_alpha=self.min_alpha, compute_loss=compute_loss, callbacks=callbacks)
         else:
             if trim_rule is not None:
                 logger.warning(
                     "The rule, if given, is only used to prune vocabulary during build_vocab() "
                     "and is not stored as part of the model. Model initialized without sentences. "
                     "trim_rule provided, if any, will be ignored.")
+            if callbacks:
+                logger.warning(
+                    "Callbacks are no longer retained by the model, so must be provided whenever "
+                    "training is triggered, as in initialization with a corpus or calling `train()`. "
+                    "The callbacks provided in this initialization without triggering train will "
+                    "be ignored.")
 
     def _clear_post_train(self):
         raise NotImplementedError()
@@ -797,18 +805,16 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
                 * `min_count` (int) - the minimum count threshold.
 
         **kwargs : object
-            Key word arguments propagated to `self.vocabulary.prepare_vocab`
+            Key word arguments propagated to `self.prepare_vocab`
 
         """
-        total_words, corpus_count = self.vocabulary.scan_vocab(
+        total_words, corpus_count = self.scan_vocab(
             sentences=sentences, corpus_file=corpus_file, progress_per=progress_per, trim_rule=trim_rule)
         self.corpus_count = corpus_count
         self.corpus_total_words = total_words
-        report_values = self.vocabulary.prepare_vocab(
-            self.hs, self.negative, self.wv, update=update, keep_raw_vocab=keep_raw_vocab,
-            trim_rule=trim_rule, **kwargs)
+        report_values = self.prepare_vocab(update=update, keep_raw_vocab=keep_raw_vocab, trim_rule=trim_rule, **kwargs)
         report_values['memory'] = self.estimate_memory(vocab_size=report_values['num_retained_words'])
-        self.trainables.prepare_weights(self.hs, self.negative, self.wv, update=update, vocabulary=self.vocabulary)
+        self.trainables.prepare_weights(self.hs, self.negative, self.wv, update=update, vocabulary=self)
 
     def build_vocab_from_freq(self, word_freq, keep_raw_vocab=False, corpus_count=None, trim_rule=None, update=False):
         """Build vocabulary from a dictionary of word frequencies.
@@ -850,15 +856,13 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
 
         # Since no sentences are provided, this is to control the corpus_count.
         self.corpus_count = corpus_count or 0
-        self.vocabulary.raw_vocab = raw_vocab
+        self.raw_vocab = raw_vocab
 
         # trim by min_count & precalculate downsampling
-        report_values = self.vocabulary.prepare_vocab(
-            self.hs, self.negative, self.wv, keep_raw_vocab=keep_raw_vocab,
-            trim_rule=trim_rule, update=update)
+        report_values = self.prepare_vocab(keep_raw_vocab=keep_raw_vocab, trim_rule=trim_rule, update=update)
         report_values['memory'] = self.estimate_memory(vocab_size=report_values['num_retained_words'])
         self.trainables.prepare_weights(
-            self.hs, self.negative, self.wv, update=update, vocabulary=self.vocabulary)  # build tables & arrays
+            self.hs, self.negative, self.wv, update=update, vocabulary=self)  # build tables & arrays
 
     def estimate_memory(self, vocab_size=None, report=None):
         """Estimate required memory for a model using current settings and provided vocabulary size.
@@ -1075,7 +1079,7 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
             "training model with %i workers on %i vocabulary and %i features, "
             "using sg=%s hs=%s sample=%s negative=%s window=%s",
             self.workers, len(self.wv.vocab), self.trainables.layer1_size, self.sg,
-            self.hs, self.vocabulary.sample, self.negative, self.window
+            self.hs, self.sample, self.negative, self.window
         )
 
     @classmethod
@@ -1112,10 +1116,8 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
         model = super(BaseWordEmbeddingsModel, cls).load(*args, **kwargs)
         if not hasattr(model, 'ns_exponent'):
             model.ns_exponent = 0.75
-        if not hasattr(model.vocabulary, 'ns_exponent'):
-            model.vocabulary.ns_exponent = 0.75
         if model.negative and hasattr(model.wv, 'index2word'):
-            model.vocabulary.make_cum_table(model.wv)  # rebuild cum_table from vocabulary
+            model.make_cum_table()  # rebuild cum_table from vocabulary  ## TODO: ???
         if not hasattr(model, 'corpus_count'):
             model.corpus_count = None
         if not hasattr(model, 'corpus_total_words'):
