@@ -467,7 +467,7 @@ cdef unsigned long long w2v_fast_sentence_cbow_neg(
 cdef init_w2v_config(Word2VecConfig *c, model, alpha, compute_loss, _work, _neu1=None):
     c[0].hs = model.hs
     c[0].negative = model.negative
-    c[0].sample = (model.vocabulary.sample != 0)
+    c[0].sample = (model.sample != 0)
     c[0].cbow_mean = model.cbow_mean
     c[0].window = model.window
     c[0].workers = model.workers
@@ -485,8 +485,8 @@ cdef init_w2v_config(Word2VecConfig *c, model, alpha, compute_loss, _work, _neu1
 
     if c[0].negative:
         c[0].syn1neg = <REAL_t *>(np.PyArray_DATA(model.trainables.syn1neg))
-        c[0].cum_table = <np.uint32_t *>(np.PyArray_DATA(model.vocabulary.cum_table))
-        c[0].cum_table_len = len(model.vocabulary.cum_table)
+        c[0].cum_table = <np.uint32_t *>(np.PyArray_DATA(model.cum_table))
+        c[0].cum_table_len = len(model.cum_table)
     if c[0].negative or c[0].sample:
         c[0].next_random = (2**24) * model.random.randint(0, 2**24) + model.random.randint(0, 2**24)
 

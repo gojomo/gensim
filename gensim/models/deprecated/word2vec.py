@@ -203,7 +203,7 @@ def load_old_word2vec(*args, **kwargs):
     # set vocabulary attributes
     new_model.wv.vocab = old_model.wv.vocab
     new_model.wv.index2word = old_model.wv.index2word
-    new_model.vocabulary.cum_table = old_model.__dict__.get('cum_table', None)
+    new_model.cum_table = old_model.__dict__.get('cum_table', None)
 
     new_model.train_count = old_model.__dict__.get('train_count', None)
     new_model.corpus_count = old_model.__dict__.get('corpus_count', None)
