@@ -476,15 +476,15 @@ cdef init_w2v_config(Word2VecConfig *c, model, alpha, compute_loss, _work, _neu1
     c[0].running_training_loss = model.running_training_loss
 
     c[0].syn0 = <REAL_t *>(np.PyArray_DATA(model.wv.vectors))
-    c[0].word_locks = <REAL_t *>(np.PyArray_DATA(model.trainables.vectors_lockf))
+    c[0].word_locks = <REAL_t *>(np.PyArray_DATA(model.vectors_lockf))
     c[0].alpha = alpha
     c[0].size = model.wv.vector_size
 
     if c[0].hs:
-        c[0].syn1 = <REAL_t *>(np.PyArray_DATA(model.trainables.syn1))
+        c[0].syn1 = <REAL_t *>(np.PyArray_DATA(model.syn1))
 
     if c[0].negative:
-        c[0].syn1neg = <REAL_t *>(np.PyArray_DATA(model.trainables.syn1neg))
+        c[0].syn1neg = <REAL_t *>(np.PyArray_DATA(model.syn1neg))
         c[0].cum_table = <np.uint32_t *>(np.PyArray_DATA(model.cum_table))
         c[0].cum_table_len = len(model.cum_table)
     if c[0].negative or c[0].sample:
@@ -709,7 +709,7 @@ def score_sentence_sg(model, sentence, _work):
     cdef long result = 0
     cdef int sentence_len
 
-    c.syn1 = <REAL_t *>(np.PyArray_DATA(model.trainables.syn1))
+    c.syn1 = <REAL_t *>(np.PyArray_DATA(model.syn1))
 
     # convert Python structures to primitive types, so we can release the GIL
     c.work = <REAL_t *>np.PyArray_DATA(_work)
@@ -804,7 +804,7 @@ def score_sentence_cbow(model, sentence, _work, _neu1):
     cdef int i, j, k
     cdef long result = 0
 
-    c.syn1 = <REAL_t *>(np.PyArray_DATA(model.trainables.syn1))
+    c.syn1 = <REAL_t *>(np.PyArray_DATA(model.syn1))
 
     # convert Python structures to primitive types, so we can release the GIL
     c.work = <REAL_t *>np.PyArray_DATA(_work)

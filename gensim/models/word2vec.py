@@ -229,7 +229,7 @@ def score_cbow_pair(model, word, l1):
 
 
 class Word2Vec(BaseWordEmbeddingsModel):
-    def __init__(self, sentences=None, corpus_file=None, size=100, alpha=0.025, window=5, min_count=5,
+    def __init__(self, sentences=None, corpus_file=None, vector_size=100, alpha=0.025, window=5, min_count=5,
                  max_vocab_size=None, sample=1e-3, seed=1, workers=3, min_alpha=0.0001,
                  sg=0, hs=0, negative=5, ns_exponent=0.75, cbow_mean=1, hashfxn=hash, iter=5, null_word=0,
                  trim_rule=None, sorted_vocab=1, batch_words=MAX_WORDS_IN_BATCH, compute_loss=False, callbacks=(),
@@ -262,7 +262,7 @@ class Word2Vec(BaseWordEmbeddingsModel):
             Path to a corpus file in :class:`~gensim.models.word2vec.LineSentence` format.
             You may use this argument instead of `sentences` to get performance boost. Only one of `sentences` or
             `corpus_file` arguments need to be passed (or none of them, in that case, the model is left uninitialized).
-        size : int, optional
+        vector_size : int, optional
             Dimensionality of the word vectors.
         window : int, optional
             Maximum distance between the current and predicted word within a sentence.
@@ -354,13 +354,6 @@ class Word2Vec(BaseWordEmbeddingsModel):
             This object essentially contains the mapping between words and embeddings. After training, it can be used
             directly to query those embeddings in various ways. See the module level docstring for examples.
 
-        trainables : :class:`~gensim.models.word2vec.Word2VecTrainables`
-            This object represents the inner shallow neural network used to train the embeddings. The semantics
-            of the network differ slightly in the two available training modes (CBOW or SG) but you can think of it
-            as a NN with single projection and hidden layer which we train on the corpus. The weights are then used
-            as our embeddings (which means that the size of the hidden layer is equal to the number of features
-            `self.size`).
-
         """
         self.max_final_vocab = max_final_vocab
         self.max_vocab_size = max_vocab_size
@@ -371,14 +364,16 @@ class Word2Vec(BaseWordEmbeddingsModel):
         self.cum_table = None  # for negative sampling
         self.raw_vocab = None
 
-        self.wv = KeyedVectors(size)
+        self.wv = KeyedVectors(vector_size)
 
-        self.trainables = Word2VecTrainables(seed=seed, vector_size=size, hashfxn=hashfxn)
+        self.hashfxn = hashfxn
+        self.layer1_size = vector_size
+        self.seed = seed
 
         self.load = call_on_class_only
 
         super(Word2Vec, self).__init__(
-            sentences=sentences, corpus_file=corpus_file, workers=workers, vector_size=size, epochs=iter,
+            sentences=sentences, corpus_file=corpus_file, workers=workers, vector_size=vector_size, epochs=iter,
             callbacks=callbacks, batch_words=batch_words, trim_rule=trim_rule, sg=sg, alpha=alpha, window=window,
             seed=seed, hs=hs, negative=negative, cbow_mean=cbow_mean, min_alpha=min_alpha, compute_loss=compute_loss)
 
@@ -630,6 +625,54 @@ class Word2Vec(BaseWordEmbeddingsModel):
         if len(self.cum_table) > 0:
             assert self.cum_table[-1] == domain
 
+    def prepare_weights(self, update=False, vocabulary=None):
+        """Build tables and model weights based on final vocabulary settings."""
+        # set initial input/projection and hidden weights
+        if not update:
+            self.reset_weights()
+        else:
+            self.update_weights()
+
+    @deprecated("Use gensim.models.keyedvectors.pseudorandom_weak_vector() directly")
+    def seeded_vector(self, seed_string, vector_size):
+        return pseudorandom_weak_vector(vector_size, seed_string=seed_string, hashfxn=self.hashfxn)
+
+    def reset_weights(self):
+        """Reset all projection weights to an initial (untrained) state, but keep the existing vocabulary."""
+        logger.info("resetting layer weights")
+        self.wv.resize_vectors()
+        self.wv.randomly_initialize_vectors(seed=self.seed)
+        if self.hs:
+            self.syn1 = zeros((len(self.wv.vocab), self.layer1_size), dtype=REAL)
+        if self.negative:
+            self.syn1neg = zeros((len(self.wv.vocab), self.layer1_size), dtype=REAL)
+
+        self.vectors_lockf = ones(len(self.wv.vocab), dtype=REAL)  # zeros suppress learning
+
+    def update_weights(self):
+        """Copy all the existing weights, and reset the weights for the newly added vocabulary."""
+        logger.info("updating layer weights")
+        new_range = self.wv.resize_vectors()
+        gained_vocab = len(new_range)
+        self.wv.randomly_initialize_vectors(indexes=new_range)
+
+        # Raise an error if an online update is run before initial training on a corpus
+        if not len(self.wv.vectors):
+            raise RuntimeError(
+                "You cannot do an online vocabulary-update of a model which has no prior vocabulary. "
+                "First build the vocabulary of your model with a corpus before doing an online update."
+            )
+
+        if self.hs:
+            self.syn1 = vstack([self.syn1, zeros((gained_vocab, self.layer1_size), dtype=REAL)])
+        if self.negative:
+            pad = zeros((gained_vocab, self.layer1_size), dtype=REAL)
+            self.syn1neg = vstack([self.syn1neg, pad])
+        self.wv.vectors_norm = None
+
+        # do not suppress learning for already learned words
+        self.vectors_lockf = ones(len(self.wv.vocab), dtype=REAL)  # zeros suppress learning
+
     def _do_train_epoch(self, corpus_file, thread_id, offset, cython_vocab, thread_private_mem, cur_epoch,
                         total_examples=None, total_words=None, **kwargs):
         work, neu1 = thread_private_mem
@@ -792,7 +835,7 @@ class Word2Vec(BaseWordEmbeddingsModel):
         logger.info(
             "scoring sentences with %i workers on %i vocabulary and %i features, "
             "using sg=%s hs=%s sample=%s and negative=%s",
-            self.workers, len(self.wv.vocab), self.trainables.layer1_size, self.sg, self.hs,
+            self.workers, len(self.wv.vocab), self.layer1_size, self.sg, self.hs,
             self.sample, self.negative
         )
 
@@ -808,7 +851,7 @@ class Word2Vec(BaseWordEmbeddingsModel):
         def worker_loop():
             """Compute log probability for each sentence, lifting lists of sentences from the jobs queue."""
             work = zeros(1, dtype=REAL)  # for sg hs, we actually only need one memory loc (running sum)
-            neu1 = matutils.zeros_aligned(self.trainables.layer1_size, dtype=REAL)
+            neu1 = matutils.zeros_aligned(self.layer1_size, dtype=REAL)
             while True:
                 job = job_queue.get()
                 if job is None:  # signal to finish
@@ -941,7 +984,7 @@ class Word2Vec(BaseWordEmbeddingsModel):
                     if word in self.wv.vocab:
                         overlap_count += 1
                         self.wv.vectors[self.wv.vocab[word].index] = weights
-                        self.trainables.vectors_lockf[self.wv.vocab[word].index] = lockf  # lock-factor: 0.0=no changes
+                        self.vectors_lockf[self.wv.vocab[word].index] = lockf  # lock-factor: 0.0=no changes
             else:
                 for line_no, line in enumerate(fin):
                     parts = utils.to_unicode(line.rstrip(), encoding=encoding, errors=unicode_errors).split(" ")
@@ -951,7 +994,7 @@ class Word2Vec(BaseWordEmbeddingsModel):
                     if word in self.wv.vocab:
                         overlap_count += 1
                         self.wv.vectors[self.wv.vocab[word].index] = weights
-                        self.trainables.vectors_lockf[self.wv.vocab[word].index] = lockf  # lock-factor: 0.0=no changes
+                        self.vectors_lockf[self.wv.vocab[word].index] = lockf  # lock-factor: 0.0=no changes
         logger.info("merged %d vectors into %s matrix from %s", overlap_count, self.wv.vectors.shape, fname)
 
     def predict_output_word(self, context_words_list, topn=10):
@@ -976,7 +1019,7 @@ class Word2Vec(BaseWordEmbeddingsModel):
                 "so you need to have run word2vec with negative > 0 for this to work."
             )
 
-        if not hasattr(self.wv, 'vectors') or not hasattr(self.trainables, 'syn1neg'):
+        if not hasattr(self.wv, 'vectors') or not hasattr(self, 'syn1neg'):
             raise RuntimeError("Parameters required for predicting the output words not found.")
 
         word_vocabs = [self.wv.vocab[w] for w in context_words_list if w in self.wv.vocab]
@@ -991,7 +1034,7 @@ class Word2Vec(BaseWordEmbeddingsModel):
             l1 /= len(word2_indices)
 
         # propagate hidden -> output and take softmax to get probabilities
-        prob_values = exp(dot(l1, self.trainables.syn1neg.T))
+        prob_values = exp(dot(l1, self.syn1neg.T))
         prob_values /= sum(prob_values)
         top_indices = matutils.argsort(prob_values, topn=topn, reverse=True)
         # returning the most probable output words with their probabilities
@@ -1018,7 +1061,7 @@ class Word2Vec(BaseWordEmbeddingsModel):
         self.wv.index2key = other_model.wv.index2key
         self.cum_table = other_model.cum_table
         self.corpus_count = other_model.corpus_count
-        self.trainables.reset_weights(self.hs, self.negative, self.wv)
+        self.reset_weights()
 
     def __str__(self):
         """Human readable representation of the model's state.
@@ -1083,12 +1126,23 @@ class Word2Vec(BaseWordEmbeddingsModel):
         try:
             model = super(Word2Vec, cls).load(*args, **kwargs)
             # for backward compatibility
+            if not hasattr(model, 'epochs'):
+                model.epochs = model.iter
+                del model.iter
             if not hasattr(model, 'max_final_vocab'):
                 model.max_final_vocab = None
             if hasattr(model, 'vocabulary'):  # re-integrate state that had been moved
                 for a in ('max_vocab_size', 'min_count', 'sample', 'sorted_vocab', 'null_word', 'raw_vocab'):
                     setattr(model, a, getattr(model.vocabulary, a))
                 del model.vocabulary
+            if hasattr(model, 'trainables'):  # re-integrate state that had been moved
+                for a in ('hashfxn', 'layer1_size', 'seed', 'syn1neg', 'syn1'):
+                    if hasattr(model.trainables, a):
+                        setattr(model, a, getattr(model.trainables, a))
+                if hasattr(model, 'syn1'):
+                    model.syn1 = model.syn1
+                    del model.syn1
+                del model.trainables
             return model
         except AttributeError:
             logger.info('Model saved using code from earlier Gensim Version. Re-loading old model in a compatible way.')
@@ -1327,6 +1381,11 @@ class Word2VecVocab(utils.SaveLoad):
     pass
 
 
+class Word2VecTrainables(utils.SaveLoad):
+    """Obsolete class retained for now as load-compatibility state capture"""
+    pass
+
+
 class Heapitem(namedtuple('Heapitem', 'count, index, left, right')):
     def __lt__(self, other):
         return self.count < other.count
@@ -1392,62 +1451,6 @@ def _assign_binary_codes(vocab):
             stack.append((node.right, array(list(codes) + [1], dtype=uint8), points))
 
     logger.info("built huffman tree with maximum node depth %i", max_depth)
-
-
-class Word2VecTrainables(utils.SaveLoad):
-    def __init__(self, vector_size=100, seed=1, hashfxn=hash):
-        """Represents the inner shallow neural network used to train :class:`~gensim.models.word2vec.Word2Vec`."""
-        self.hashfxn = hashfxn
-        self.layer1_size = vector_size
-        self.seed = seed
-
-    def prepare_weights(self, hs, negative, wv, update=False, vocabulary=None):
-        """Build tables and model weights based on final vocabulary settings."""
-        # set initial input/projection and hidden weights
-        if not update:
-            self.reset_weights(hs, negative, wv)
-        else:
-            self.update_weights(hs, negative, wv)
-
-    @deprecated("Use gensim.models.keyedvectors.pseudorandom_weak_vector() directly")
-    def seeded_vector(self, seed_string, vector_size):
-        return pseudorandom_weak_vector(vector_size, seed_string=seed_string, hashfxn=self.hashfxn)
-
-    def reset_weights(self, hs, negative, wv):
-        """Reset all projection weights to an initial (untrained) state, but keep the existing vocabulary."""
-        logger.info("resetting layer weights")
-        wv.resize_vectors()
-        wv.randomly_initialize_vectors(seed=self.seed)
-        if hs:
-            self.syn1 = zeros((len(wv.vocab), self.layer1_size), dtype=REAL)
-        if negative:
-            self.syn1neg = zeros((len(wv.vocab), self.layer1_size), dtype=REAL)
-
-        self.vectors_lockf = ones(len(wv.vocab), dtype=REAL)  # zeros suppress learning
-
-    def update_weights(self, hs, negative, wv):
-        """Copy all the existing weights, and reset the weights for the newly added vocabulary."""
-        logger.info("updating layer weights")
-        new_range = wv.resize_vectors()
-        gained_vocab = len(new_range)
-        wv.randomly_initialize_vectors(indexes=new_range)
-
-        # Raise an error if an online update is run before initial training on a corpus
-        if not len(wv.vectors):
-            raise RuntimeError(
-                "You cannot do an online vocabulary-update of a model which has no prior vocabulary. "
-                "First build the vocabulary of your model with a corpus before doing an online update."
-            )
-
-        if hs:
-            self.syn1 = vstack([self.syn1, zeros((gained_vocab, self.layer1_size), dtype=REAL)])
-        if negative:
-            pad = zeros((gained_vocab, self.layer1_size), dtype=REAL)
-            self.syn1neg = vstack([self.syn1neg, pad])
-        wv.vectors_norm = None
-
-        # do not suppress learning for already learned words
-        self.vectors_lockf = ones(len(wv.vocab), dtype=REAL)  # zeros suppress learning
 
 
 # Example: ./word2vec.py -train data.txt -output vec.txt -size 200 -window 5 -sample 1e-4 \
