@@ -83,8 +83,6 @@ class BaseAny2VecModel(utils.SaveLoad):
         A subclass should initialize the following attributes:
 
         * self.kv - keyed vectors in model (see :class:`~gensim.models.keyedvectors.Word2VecKeyedVectors` as example)
-        * self.vocabulary - vocabulary (see :class:`~gensim.models.word2vec.Word2VecVocab` as example)
-        * self.trainables - internal matrices (see :class:`~gensim.models.word2vec.Word2VecTrainables` as example)
 
         """
         self.vector_size = int(vector_size)
@@ -814,7 +812,7 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
         self.corpus_total_words = total_words
         report_values = self.prepare_vocab(update=update, keep_raw_vocab=keep_raw_vocab, trim_rule=trim_rule, **kwargs)
         report_values['memory'] = self.estimate_memory(vocab_size=report_values['num_retained_words'])
-        self.trainables.prepare_weights(self.hs, self.negative, self.wv, update=update, vocabulary=self)
+        self.prepare_weights(update=update, vocabulary=self)
 
     def build_vocab_from_freq(self, word_freq, keep_raw_vocab=False, corpus_count=None, trim_rule=None, update=False):
         """Build vocabulary from a dictionary of word frequencies.
@@ -861,8 +859,7 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
         # trim by min_count & precalculate downsampling
         report_values = self.prepare_vocab(keep_raw_vocab=keep_raw_vocab, trim_rule=trim_rule, update=update)
         report_values['memory'] = self.estimate_memory(vocab_size=report_values['num_retained_words'])
-        self.trainables.prepare_weights(
-            self.hs, self.negative, self.wv, update=update, vocabulary=self)  # build tables & arrays
+        self.prepare_weights(update=update, vocabulary=self)  # build tables & arrays
 
     def estimate_memory(self, vocab_size=None, report=None):
         """Estimate required memory for a model using current settings and provided vocabulary size.
@@ -885,9 +882,9 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
         report['vocab'] = vocab_size * (700 if self.hs else 500)
         report['vectors'] = vocab_size * self.vector_size * dtype(REAL).itemsize
         if self.hs:
-            report['syn1'] = vocab_size * self.trainables.layer1_size * dtype(REAL).itemsize
+            report['syn1'] = vocab_size * self.layer1_size * dtype(REAL).itemsize
         if self.negative:
-            report['syn1neg'] = vocab_size * self.trainables.layer1_size * dtype(REAL).itemsize
+            report['syn1neg'] = vocab_size * self.layer1_size * dtype(REAL).itemsize
         report['total'] = sum(report.values())
         logger.info(
             "estimated required memory for %i words and %i dimensions: %i bytes",
@@ -1004,8 +1001,8 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
             Each worker threads private work memory.
 
         """
-        work = matutils.zeros_aligned(self.trainables.layer1_size, dtype=REAL)  # per-thread private work memory
-        neu1 = matutils.zeros_aligned(self.trainables.layer1_size, dtype=REAL)
+        work = matutils.zeros_aligned(self.layer1_size, dtype=REAL)  # per-thread private work memory
+        neu1 = matutils.zeros_aligned(self.layer1_size, dtype=REAL)
         return work, neu1
 
     def _raw_word_count(self, job):
@@ -1078,7 +1075,7 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
         logger.info(
             "training model with %i workers on %i vocabulary and %i features, "
             "using sg=%s hs=%s sample=%s negative=%s window=%s",
-            self.workers, len(self.wv.vocab), self.trainables.layer1_size, self.sg,
+            self.workers, len(self.wv.vocab), self.layer1_size, self.sg,
             self.hs, self.sample, self.negative, self.window
         )
 
@@ -1122,10 +1119,10 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
             model.corpus_count = None
         if not hasattr(model, 'corpus_total_words'):
             model.corpus_total_words = None
-        if not hasattr(model.trainables, 'vectors_lockf') and hasattr(model.wv, 'vectors'):
-            model.trainables.vectors_lockf = ones(len(model.wv.vectors), dtype=REAL)
+        if not hasattr(model, 'vectors_lockf') and hasattr(model.wv, 'vectors'):
+            model.vectors_lockf = ones(len(model.wv.vectors), dtype=REAL)
         if not hasattr(model, 'random'):
-            model.random = random.RandomState(model.trainables.seed)
+            model.random = random.RandomState(model.seed)
         if not hasattr(model, 'train_count'):
             model.train_count = 0
             model.total_train_time = 0

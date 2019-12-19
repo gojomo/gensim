@@ -169,7 +169,7 @@ def load_old_word2vec(*args, **kwargs):
     old_model = Word2Vec.load(*args, **kwargs)
     vector_size = getattr(old_model, 'vector_size', old_model.layer1_size)
     params = {
-        'size': vector_size,
+        'vector_size': vector_size,
         'alpha': old_model.alpha,
         'window': old_model.window,
         'min_count': old_model.min_count,
@@ -195,11 +195,11 @@ def load_old_word2vec(*args, **kwargs):
     if hasattr(old_model.wv, 'syn0norm'):
         new_model.wv.vectors_norm = old_model.wv.syn0norm
     if hasattr(old_model, 'syn1'):
-        new_model.trainables.syn1 = old_model.syn1
+        new_model.syn1 = old_model.syn1
     if hasattr(old_model, 'syn1neg'):
-        new_model.trainables.syn1neg = old_model.syn1neg
+        new_model.syn1neg = old_model.syn1neg
     if hasattr(old_model, 'syn0_lockf'):
-        new_model.trainables.vectors_lockf = old_model.syn0_lockf
+        new_model.vectors_lockf = old_model.syn0_lockf
     # set vocabulary attributes
     new_model.wv.vocab = old_model.wv.vocab
     new_model.wv.index2word = old_model.wv.index2word
