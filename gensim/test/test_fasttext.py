@@ -103,12 +103,12 @@ class TestFastTextModel(unittest.TestCase):
     def testFastTextTrainParameters(self):
 
         model = FT_gensim(size=12, min_count=1, hs=1, negative=0, seed=42, workers=1)
-        model.build_vocab(sentences=sentences)
+        model.build_vocab(corpus_iterable=sentences)
 
         self.assertRaises(TypeError, model.train, corpus_file=11111)
-        self.assertRaises(TypeError, model.train, sentences=11111)
-        self.assertRaises(TypeError, model.train, sentences=sentences, corpus_file='test')
-        self.assertRaises(TypeError, model.train, sentences=None, corpus_file=None)
+        self.assertRaises(TypeError, model.train, corpus_iterable=11111)
+        self.assertRaises(TypeError, model.train, corpus_iterable=sentences, corpus_file='test')
+        self.assertRaises(TypeError, model.train, corpus_iterable=None, corpus_file=None)
         self.assertRaises(TypeError, model.train, corpus_file=sentences)
 
     def test_training_fromfile(self):
@@ -148,9 +148,9 @@ class TestFastTextModel(unittest.TestCase):
         self.assertTrue(np.allclose(model.wv.vectors_ngrams, model2.wv.vectors_ngrams))
         self.assertTrue(np.allclose(model.wv.vectors, model2.wv.vectors))
         if model.hs:
-            self.assertTrue(np.allclose(model.trainables.syn1, model2.trainables.syn1))
+            self.assertTrue(np.allclose(model.syn1, model2.syn1))
         if model.negative:
-            self.assertTrue(np.allclose(model.trainables.syn1neg, model2.trainables.syn1neg))
+            self.assertTrue(np.allclose(model.syn1neg, model2.syn1neg))
         most_common_word = max(model.wv.vocab.items(), key=lambda item: item[1].count)[0]
         self.assertTrue(np.allclose(model.wv[most_common_word], model2.wv[most_common_word]))
 
@@ -243,12 +243,12 @@ class TestFastTextModel(unittest.TestCase):
         actual_vec_oov = model.wv["rejection"]
         self.assertTrue(np.allclose(actual_vec_oov, expected_vec_oov, atol=1e-4))
 
-        self.assertEqual(model.vocabulary.min_count, 5)
+        self.assertEqual(model.min_count, 5)
         self.assertEqual(model.window, 5)
         self.assertEqual(model.epochs, 5)
         self.assertEqual(model.negative, 5)
-        self.assertEqual(model.vocabulary.sample, 0.0001)
-        self.assertEqual(model.trainables.bucket, 1000)
+        self.assertEqual(model.sample, 0.0001)
+        self.assertEqual(model.bucket, 1000)
         self.assertEqual(model.wv.max_n, 6)
         self.assertEqual(model.wv.min_n, 3)
         self.assertEqual(model.wv.vectors.shape, (len(model.wv.vocab), model.vector_size))
@@ -296,12 +296,12 @@ class TestFastTextModel(unittest.TestCase):
         actual_vec_oov = new_model.wv["rejection"]
         self.assertTrue(np.allclose(actual_vec_oov, expected_vec_oov, atol=1e-4))
 
-        self.assertEqual(new_model.vocabulary.min_count, 5)
+        self.assertEqual(new_model.min_count, 5)
         self.assertEqual(new_model.window, 5)
         self.assertEqual(new_model.epochs, 5)
         self.assertEqual(new_model.negative, 5)
-        self.assertEqual(new_model.vocabulary.sample, 0.0001)
-        self.assertEqual(new_model.trainables.bucket, 1000)
+        self.assertEqual(new_model.sample, 0.0001)
+        self.assertEqual(new_model.bucket, 1000)
         self.assertEqual(new_model.wv.max_n, 6)
         self.assertEqual(new_model.wv.min_n, 3)
         self.assertEqual(new_model.wv.vectors.shape, (len(new_model.wv.vocab), new_model.vector_size))
@@ -784,9 +784,9 @@ class TestFastTextModel(unittest.TestCase):
         self.assertTrue(len(model.wv.vocab) == 12)
         self.assertTrue(len(model.wv.index2word) == 12)
         self.assertIsNone(model.corpus_total_words)
-        self.assertTrue(model.trainables.syn1neg.shape == (len(model.wv.vocab), model.vector_size))
-        self.assertTrue(model.trainables.vectors_lockf.shape == (12, ))
-        self.assertTrue(model.vocabulary.cum_table.shape == (12, ))
+        self.assertTrue(model.syn1neg.shape == (len(model.wv.vocab), model.vector_size))
+        self.assertTrue(model.wv.vectors_lockf.shape == (12, ))
+        self.assertTrue(model.cum_table.shape == (12, ))
 
         self.assertEqual(model.wv.vectors_vocab.shape, (12, 100))
         self.assertEqual(model.wv.vectors_ngrams.shape, (2000000, 100))
@@ -798,9 +798,9 @@ class TestFastTextModel(unittest.TestCase):
         self.assertTrue(len(model.wv.vocab) == 12)
         self.assertTrue(len(model.wv.index2word) == 12)
         self.assertIsNone(model.corpus_total_words)
-        self.assertTrue(model.trainables.syn1neg.shape == (len(model.wv.vocab), model.vector_size))
-        self.assertTrue(model.trainables.vectors_lockf.shape == (12, ))
-        self.assertTrue(model.vocabulary.cum_table.shape == (12, ))
+        self.assertTrue(model.syn1neg.shape == (len(model.wv.vocab), model.vector_size))
+        self.assertTrue(model.wv.vectors_lockf.shape == (12, ))
+        self.assertTrue(model.cum_table.shape == (12, ))
 
         self.assertEqual(model.wv.vectors_vocab.shape, (12, 100))
         self.assertEqual(model.wv.vectors_ngrams.shape, (2000000, 100))
@@ -1025,8 +1025,8 @@ class NativeTrainingContinuationTest(unittest.TestCase):
         # self.assertEqual(trained.bucket, native.bucket)
 
         compare_wv(trained.wv, native.wv, self)
-        compare_vocabulary(trained.vocabulary, native.vocabulary, self)
-        compare_nn(trained.trainables, native.trainables, self)
+        compare_vocabulary(trained, native, self)
+        compare_nn(trained, native, self)
 
     def test_continuation_native(self):
         """Ensure that training has had a measurable effect."""
@@ -1149,7 +1149,7 @@ class HashCompatibilityTest(unittest.TestCase):
     def test_compatibility_true(self):
         m = FT_gensim.load(datapath('compatible-hash-true.model'))
         self.assertTrue(m.wv.compatible_hash)
-        self.assertEqual(m.trainables.bucket, m.wv.bucket)
+        self.assertEqual(m.bucket, m.wv.bucket)
 
     def test_compatibility_false(self):
         #
@@ -1157,12 +1157,12 @@ class HashCompatibilityTest(unittest.TestCase):
         #
         m = FT_gensim.load(datapath('compatible-hash-false.model'))
         self.assertFalse(m.wv.compatible_hash)
-        self.assertEqual(m.trainables.bucket, m.wv.bucket)
+        self.assertEqual(m.bucket, m.wv.bucket)
 
     def test_hash_native(self):
         m = load_native()
         self.assertTrue(m.wv.compatible_hash)
-        self.assertEqual(m.trainables.bucket, m.wv.bucket)
+        self.assertEqual(m.bucket, m.wv.bucket)
 
 
 class FTHashResultsTest(unittest.TestCase):

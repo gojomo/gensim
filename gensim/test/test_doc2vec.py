@@ -75,7 +75,7 @@ class TestDoc2VecModel(unittest.TestCase):
     @unittest.skipIf(os.name == 'nt' and six.PY2, "corpus_file training is not supported on Windows + Py27")
     def test_persistence_fromfile(self):
         """Test storing/loading the entire model."""
-        with temporary_file(get_tmpfile('gensim_word2vec.tst')) as corpus_file:
+        with temporary_file(get_tmpfile('gensim_doc2vec.tst')) as corpus_file:
             save_lee_corpus_as_line_sentence(corpus_file)
 
             tmpf = get_tmpfile('gensim_doc2vec.tst')
@@ -111,12 +111,12 @@ class TestDoc2VecModel(unittest.TestCase):
         self.assertTrue(len(model.wv.vocab) == 3955)
         self.assertTrue(len(model.wv.index2word) == 3955)
         self.assertIsNone(model.corpus_total_words)
-        self.assertTrue(model.trainables.syn1neg.shape == (len(model.wv.vocab), model.vector_size))
-        self.assertTrue(model.trainables.vectors_lockf.shape == (3955, ))
-        self.assertTrue(model.vocabulary.cum_table.shape == (3955, ))
+        self.assertTrue(model.syn1neg.shape == (len(model.wv.vocab), model.vector_size))
+        self.assertTrue(model.wv.vectors_lockf.shape == (3955, ))
+        self.assertTrue(model.cum_table.shape == (3955, ))
 
         self.assertTrue(model.docvecs.vectors.shape == (300, 100))
-        self.assertTrue(model.trainables.vectors_docs_lockf.shape == (300, ))
+        self.assertTrue(model.docvecs.vectors_lockf.shape == (300, ))
         self.assertTrue(len(model.docvecs) == 300)
 
         self.model_sanity(model)
@@ -131,11 +131,11 @@ class TestDoc2VecModel(unittest.TestCase):
         self.assertTrue(len(model.wv.vocab) == 3955)
         self.assertTrue(len(model.wv.index2word) == 3955)
         self.assertIsNone(model.corpus_total_words)
-        self.assertTrue(model.trainables.syn1neg.shape == (len(model.wv.vocab), model.vector_size))
-        self.assertTrue(model.trainables.vectors_lockf.shape == (3955, ))
-        self.assertTrue(model.vocabulary.cum_table.shape == (3955, ))
+        self.assertTrue(model.syn1neg.shape == (len(model.wv.vocab), model.vector_size))
+        self.assertTrue(model.wv.vectors_lockf.shape == (3955, ))
+        self.assertTrue(model.cum_table.shape == (3955, ))
         self.assertTrue(model.docvecs.vectors.shape == (300, 100))
-        self.assertTrue(model.trainables.vectors_docs_lockf.shape == (300, ))
+        self.assertTrue(model.docvecs.vectors_lockf.shape == (300, ))
         self.assertTrue(len(model.docvecs) == 300)
 
         self.model_sanity(model)
@@ -201,12 +201,12 @@ class TestDoc2VecModel(unittest.TestCase):
     def testDoc2vecTrainParameters(self):
 
         model = doc2vec.Doc2Vec(vector_size=50)
-        model.build_vocab(documents=list_corpus)
+        model.build_vocab(corpus_iterable=list_corpus)
 
         self.assertRaises(TypeError, model.train, corpus_file=11111)
-        self.assertRaises(TypeError, model.train, documents=11111)
-        self.assertRaises(TypeError, model.train, documents=sentences, corpus_file='test')
-        self.assertRaises(TypeError, model.train, documents=None, corpus_file=None)
+        self.assertRaises(TypeError, model.train, corpus_iterable=11111)
+        self.assertRaises(TypeError, model.train, corpus_iterable=sentences, corpus_file='test')
+        self.assertRaises(TypeError, model.train, corpus_iterable=None, corpus_file=None)
         self.assertRaises(TypeError, model.train, corpus_file=sentences)
 
     @unittest.skipIf(os.name == 'nt', "See another test for Windows below")
@@ -418,10 +418,10 @@ class TestDoc2VecModel(unittest.TestCase):
 
         # keep training after save
         if keep_training:
-            tmpf = get_tmpfile('gensim_doc2vec.tst')
+            tmpf = get_tmpfile('gensim_doc2vec_resave.tst')
             model.save(tmpf)
             loaded = doc2vec.Doc2Vec.load(tmpf)
-            loaded.train(documents=sentences, total_examples=loaded.corpus_count, epochs=loaded.epochs)
+            loaded.train(corpus_iterable=sentences, total_examples=loaded.corpus_count, epochs=loaded.epochs)
 
     def test_training(self):
         """Test doc2vec training."""
@@ -440,7 +440,7 @@ class TestDoc2VecModel(unittest.TestCase):
     @unittest.skipIf(os.name == 'nt' and six.PY2, "corpus_file training is not supported on Windows + Py27")
     def test_training_fromfile(self):
         """Test doc2vec training."""
-        with temporary_file(get_tmpfile('gensim_word2vec.tst')) as corpus_file:
+        with temporary_file(get_tmpfile('gensim_doc2vec.tst')) as corpus_file:
             save_lee_corpus_as_line_sentence(corpus_file)
 
             model = doc2vec.Doc2Vec(vector_size=100, min_count=2, epochs=20, workers=1)
@@ -461,7 +461,7 @@ class TestDoc2VecModel(unittest.TestCase):
     @unittest.skipIf(os.name == 'nt' and six.PY2, "corpus_file training is not supported on Windows + Py27")
     def test_dbow_hs_fromfile(self):
         """Test DBOW doc2vec training."""
-        with temporary_file(get_tmpfile('gensim_word2vec.tst')) as corpus_file:
+        with temporary_file(get_tmpfile('gensim_doc2vec.tst')) as corpus_file:
             save_lee_corpus_as_line_sentence(corpus_file)
             model = doc2vec.Doc2Vec(corpus_file=corpus_file, dm=0, hs=1, negative=0, min_count=2, epochs=20)
             self.model_sanity(model)
@@ -477,7 +477,7 @@ class TestDoc2VecModel(unittest.TestCase):
     @unittest.skipIf(os.name == 'nt' and six.PY2, "corpus_file training is not supported on Windows + Py27")
     def test_dmm_hs_fromfile(self):
         """Test DBOW doc2vec training."""
-        with temporary_file(get_tmpfile('gensim_word2vec.tst')) as corpus_file:
+        with temporary_file(get_tmpfile('gensim_doc2vec.tst')) as corpus_file:
             save_lee_corpus_as_line_sentence(corpus_file)
             model = doc2vec.Doc2Vec(
                 list_corpus, dm=1, dm_mean=1, vector_size=24, window=4,
@@ -496,7 +496,7 @@ class TestDoc2VecModel(unittest.TestCase):
     @unittest.skipIf(os.name == 'nt' and six.PY2, "corpus_file training is not supported on Windows + Py27")
     def test_dms_hs_fromfile(self):
         """Test DBOW doc2vec training."""
-        with temporary_file(get_tmpfile('gensim_word2vec.tst')) as corpus_file:
+        with temporary_file(get_tmpfile('gensim_doc2vec.tst')) as corpus_file:
             save_lee_corpus_as_line_sentence(corpus_file)
             model = doc2vec.Doc2Vec(
                 list_corpus, dm=1, dm_mean=0, vector_size=24, window=4, hs=1,
@@ -515,7 +515,7 @@ class TestDoc2VecModel(unittest.TestCase):
     @unittest.skipIf(os.name == 'nt' and six.PY2, "corpus_file training is not supported on Windows + Py27")
     def test_dmc_hs_fromfile(self):
         """Test DBOW doc2vec training."""
-        with temporary_file(get_tmpfile('gensim_word2vec.tst')) as corpus_file:
+        with temporary_file(get_tmpfile('gensim_doc2vec.tst')) as corpus_file:
             save_lee_corpus_as_line_sentence(corpus_file)
             model = doc2vec.Doc2Vec(
                 list_corpus, dm=1, dm_concat=1, vector_size=24, window=4,
@@ -531,7 +531,7 @@ class TestDoc2VecModel(unittest.TestCase):
     @unittest.skipIf(os.name == 'nt' and six.PY2, "corpus_file training is not supported on Windows + Py27")
     def test_dbow_neg_fromfile(self):
         """Test DBOW doc2vec training."""
-        with temporary_file(get_tmpfile('gensim_word2vec.tst')) as corpus_file:
+        with temporary_file(get_tmpfile('gensim_doc2vec.tst')) as corpus_file:
             save_lee_corpus_as_line_sentence(corpus_file)
             model = doc2vec.Doc2Vec(list_corpus, dm=0, hs=0, negative=10, min_count=2, epochs=20)
             self.model_sanity(model)
@@ -547,7 +547,7 @@ class TestDoc2VecModel(unittest.TestCase):
     @unittest.skipIf(os.name == 'nt' and six.PY2, "corpus_file training is not supported on Windows + Py27")
     def test_dmm_neg_fromfile(self):
         """Test DBOW doc2vec training."""
-        with temporary_file(get_tmpfile('gensim_word2vec.tst')) as corpus_file:
+        with temporary_file(get_tmpfile('gensim_doc2vec.tst')) as corpus_file:
             save_lee_corpus_as_line_sentence(corpus_file)
             model = doc2vec.Doc2Vec(
                 list_corpus, dm=1, dm_mean=1, vector_size=24, window=4, hs=0,
@@ -566,7 +566,7 @@ class TestDoc2VecModel(unittest.TestCase):
     @unittest.skipIf(os.name == 'nt' and six.PY2, "corpus_file training is not supported on Windows + Py27")
     def test_dms_neg_fromfile(self):
         """Test DBOW doc2vec training."""
-        with temporary_file(get_tmpfile('gensim_word2vec.tst')) as corpus_file:
+        with temporary_file(get_tmpfile('gensim_doc2vec.tst')) as corpus_file:
             save_lee_corpus_as_line_sentence(corpus_file)
             model = doc2vec.Doc2Vec(
                 list_corpus, dm=1, dm_mean=0, vector_size=24, window=4, hs=0,
@@ -585,7 +585,7 @@ class TestDoc2VecModel(unittest.TestCase):
     @unittest.skipIf(os.name == 'nt' and six.PY2, "corpus_file training is not supported on Windows + Py27")
     def test_dmc_neg_fromfile(self):
         """Test DBOW doc2vec training."""
-        with temporary_file(get_tmpfile('gensim_word2vec.tst')) as corpus_file:
+        with temporary_file(get_tmpfile('gensim_doc2vec.tst')) as corpus_file:
             save_lee_corpus_as_line_sentence(corpus_file)
             model = doc2vec.Doc2Vec(
                 list_corpus, dm=1, dm_concat=1, vector_size=24, window=4, hs=0,
@@ -641,9 +641,9 @@ class TestDoc2VecModel(unittest.TestCase):
         self.assertEqual(len(model.wv.vocab), len(model2.wv.vocab))
         self.assertTrue(np.allclose(model.wv.vectors, model2.wv.vectors))
         if model.hs:
-            self.assertTrue(np.allclose(model.trainables.syn1, model2.trainables.syn1))
+            self.assertTrue(np.allclose(model.syn1, model2.syn1))
         if model.negative:
-            self.assertTrue(np.allclose(model.trainables.syn1neg, model2.trainables.syn1neg))
+            self.assertTrue(np.allclose(model.syn1neg, model2.syn1neg))
         # check docvecs
         self.assertEqual(len(model.docvecs.map), len(model2.docvecs.map))
         self.assertEqual(len(model.docvecs.index2key), len(model2.docvecs.index2key))

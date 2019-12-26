@@ -183,7 +183,7 @@ def load_old_word2vec(*args, **kwargs):
         'negative': old_model.negative,
         'cbow_mean': old_model.cbow_mean,
         'hashfxn': old_model.__dict__.get('hashfxn', hash),
-        'iter': old_model.__dict__.get('iter', 5),
+        'epochs': old_model.__dict__.get('iter', 5),
         'null_word': old_model.__dict__.get('null_word', 0),
         'sorted_vocab': old_model.__dict__.get('sorted_vocab', 1),
         'batch_words': old_model.__dict__.get('batch_words', MAX_WORDS_IN_BATCH),
