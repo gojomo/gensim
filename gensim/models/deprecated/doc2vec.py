@@ -121,25 +121,25 @@ def load_old_doc2vec(*args, **kwargs):
     if hasattr(old_model.wv, 'syn0norm'):
         new_model.docvecs.vectors_norm = old_model.wv.syn0norm
     if hasattr(old_model, 'syn1'):
-        new_model.trainables.syn1 = old_model.syn1
+        new_model.syn1 = old_model.syn1
     if hasattr(old_model, 'syn1neg'):
-        new_model.trainables.syn1neg = old_model.syn1neg
+        new_model.syn1neg = old_model.syn1neg
     if hasattr(old_model, 'syn0_lockf'):
-        new_model.trainables.vectors_lockf = old_model.syn0_lockf
+        new_model.wv.vectors_lockf = old_model.syn0_lockf
 
     # set doc2vec trainables attributes
     new_model.docvecs.vectors_docs = old_model.docvecs.doctag_syn0
-    if hasattr(old_model.docvecs, 'doctag_syn0norm'):
-        new_model.docvecs.vectors_docs_norm = old_model.docvecs.doctag_syn0norm
+#    if hasattr(old_model.docvecs, 'doctag_syn0norm'):
+#        new_model.docvecs.vectors_docs_norm = old_model.docvecs.doctag_syn0norm
     if hasattr(old_model.docvecs, 'doctag_syn0_lockf'):
-        new_model.trainables.vectors_docs_lockf = old_model.docvecs.doctag_syn0_lockf
+        new_model.docvecs.vectors_lockf = old_model.docvecs.doctag_syn0_lockf
     if hasattr(old_model.docvecs, 'mapfile_path'):
         new_model.docvecs.mapfile_path = old_model.docvecs.mapfile_path
 
     # set word2vec vocabulary attributes
     new_model.wv.vocab = old_model.wv.vocab
     new_model.wv.index2word = old_model.wv.index2word
-    new_model.vocabulary.cum_table = old_model.cum_table
+    new_model.cum_table = old_model.cum_table
 
     # set doc2vec vocabulary attributes
     new_model.docvecs.doctags = old_model.docvecs.doctags

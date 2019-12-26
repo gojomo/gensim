@@ -263,19 +263,19 @@ class TestWord2VecModel(unittest.TestCase):
 
     def test_sg_hs_online(self):
         """Test skipgram w/ hierarchical softmax"""
-        model = word2vec.Word2Vec(sg=1, window=5, hs=1, negative=0, min_count=3, iter=10, seed=42, workers=2)
+        model = word2vec.Word2Vec(sg=1, window=5, hs=1, negative=0, min_count=3, epochs=10, seed=42, workers=2)
         self.onlineSanity(model)
 
     def test_sg_neg_online(self):
         """Test skipgram w/ negative sampling"""
-        model = word2vec.Word2Vec(sg=1, window=4, hs=0, negative=15, min_count=3, iter=10, seed=42, workers=2)
+        model = word2vec.Word2Vec(sg=1, window=4, hs=0, negative=15, min_count=3, epochs=10, seed=42, workers=2)
         self.onlineSanity(model)
 
     def test_cbow_hs_online(self):
         """Test CBOW w/ hierarchical softmax"""
         model = word2vec.Word2Vec(
             sg=0, cbow_mean=1, alpha=0.05, window=5, hs=1, negative=0,
-            min_count=3, iter=10, seed=42, workers=2
+            min_count=3, epochs=10, seed=42, workers=2
         )
         self.onlineSanity(model)
 
@@ -283,7 +283,7 @@ class TestWord2VecModel(unittest.TestCase):
         """Test CBOW w/ negative sampling"""
         model = word2vec.Word2Vec(
             sg=0, cbow_mean=1, alpha=0.05, window=5, hs=0, negative=15,
-            min_count=5, iter=10, seed=42, workers=2, sample=0
+            min_count=5, epochs=10, seed=42, workers=2, sample=0
         )
         self.onlineSanity(model)
 
@@ -590,7 +590,7 @@ class TestWord2VecModel(unittest.TestCase):
             locked0 = np.copy(model.wv.vectors[0])
             unlocked1 = np.copy(model.wv.vectors[1])
             # lock the vector in slot 0 against change
-            model.vectors_lockf[0] = 0.0
+            model.wv.vectors_lockf[0] = 0.0
 
             model.train(corpus, total_examples=model.corpus_count, epochs=model.epochs)
             self.assertFalse((unlocked1 == model.wv.vectors[1]).all())  # unlocked vector should vary
@@ -612,7 +612,7 @@ class TestWord2VecModel(unittest.TestCase):
     def testEvaluateWordPairs(self):
         """Test Spearman and Pearson correlation coefficients give sane results on similarity datasets"""
         corpus = word2vec.LineSentence(datapath('head500.noblanks.cor.bz2'))
-        model = word2vec.Word2Vec(corpus, min_count=3, iter=10)
+        model = word2vec.Word2Vec(corpus, min_count=3, epochs=10)
         correlation = model.wv.evaluate_word_pairs(datapath('wordsim353.tsv'))
         pearson = correlation[0][0]
         spearman = correlation[1][0]
@@ -627,7 +627,7 @@ class TestWord2VecModel(unittest.TestCase):
         with temporary_file(get_tmpfile('gensim_word2vec.tst')) as tf:
             utils.save_as_line_sentence(word2vec.LineSentence(datapath('head500.noblanks.cor.bz2')), tf)
 
-            model = word2vec.Word2Vec(corpus_file=tf, min_count=3, iter=10)
+            model = word2vec.Word2Vec(corpus_file=tf, min_count=3, epochs=10)
             correlation = model.wv.evaluate_word_pairs(datapath('wordsim353.tsv'))
             pearson = correlation[0][0]
             spearman = correlation[1][0]
@@ -661,29 +661,29 @@ class TestWord2VecModel(unittest.TestCase):
 
     def test_sg_hs(self):
         """Test skipgram w/ hierarchical softmax"""
-        model = word2vec.Word2Vec(sg=1, window=4, hs=1, negative=0, min_count=5, iter=10, workers=2)
+        model = word2vec.Word2Vec(sg=1, window=4, hs=1, negative=0, min_count=5, epochs=10, workers=2)
         self.model_sanity(model)
 
     @unittest.skipIf(os.name == 'nt' and six.PY2, "CythonLineSentence is not supported on Windows + Py27")
     def test_sg_hs_fromfile(self):
-        model = word2vec.Word2Vec(sg=1, window=4, hs=1, negative=0, min_count=5, iter=10, workers=2)
+        model = word2vec.Word2Vec(sg=1, window=4, hs=1, negative=0, min_count=5, epochs=10, workers=2)
         self.model_sanity(model, with_corpus_file=True)
 
     def test_sg_neg(self):
         """Test skipgram w/ negative sampling"""
-        model = word2vec.Word2Vec(sg=1, window=4, hs=0, negative=15, min_count=5, iter=10, workers=2)
+        model = word2vec.Word2Vec(sg=1, window=4, hs=0, negative=15, min_count=5, epochs=10, workers=2)
         self.model_sanity(model)
 
     @unittest.skipIf(os.name == 'nt' and six.PY2, "CythonLineSentence is not supported on Windows + Py27")
     def test_sg_neg_fromfile(self):
-        model = word2vec.Word2Vec(sg=1, window=4, hs=0, negative=15, min_count=5, iter=10, workers=2)
+        model = word2vec.Word2Vec(sg=1, window=4, hs=0, negative=15, min_count=5, epochs=10, workers=2)
         self.model_sanity(model, with_corpus_file=True)
 
     def test_cbow_hs(self):
         """Test CBOW w/ hierarchical softmax"""
         model = word2vec.Word2Vec(
             sg=0, cbow_mean=1, alpha=0.05, window=8, hs=1, negative=0,
-            min_count=5, iter=10, workers=2, batch_words=1000
+            min_count=5, epochs=10, workers=2, batch_words=1000
         )
         self.model_sanity(model)
 
@@ -691,7 +691,7 @@ class TestWord2VecModel(unittest.TestCase):
     def test_cbow_hs_fromfile(self):
         model = word2vec.Word2Vec(
             sg=0, cbow_mean=1, alpha=0.05, window=8, hs=1, negative=0,
-            min_count=5, iter=10, workers=2, batch_words=1000
+            min_count=5, epochs=10, workers=2, batch_words=1000
         )
         self.model_sanity(model, with_corpus_file=True)
 
@@ -699,7 +699,7 @@ class TestWord2VecModel(unittest.TestCase):
         """Test CBOW w/ negative sampling"""
         model = word2vec.Word2Vec(
             sg=0, cbow_mean=1, alpha=0.05, window=5, hs=0, negative=15,
-            min_count=5, iter=10, workers=2, sample=0
+            min_count=5, epochs=10, workers=2, sample=0
         )
         self.model_sanity(model)
 
@@ -707,7 +707,7 @@ class TestWord2VecModel(unittest.TestCase):
     def test_cbow_neg_fromfile(self):
         model = word2vec.Word2Vec(
             sg=0, cbow_mean=1, alpha=0.05, window=5, hs=0, negative=15,
-            min_count=5, iter=10, workers=2, sample=0
+            min_count=5, epochs=10, workers=2, sample=0
         )
         self.model_sanity(model, with_corpus_file=True)
 
