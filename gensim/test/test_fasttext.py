@@ -71,7 +71,7 @@ class TestFastTextModel(unittest.TestCase):
         self.test_new_model_file = datapath('lee_fasttext_new.bin')
 
     def test_training(self):
-        model = FT_gensim(size=12, min_count=1, hs=1, negative=0, seed=42, workers=1, bucket=BUCKET)
+        model = FT_gensim(vector_size=12, min_count=1, hs=1, negative=0, seed=42, workers=1, bucket=BUCKET)
         model.build_vocab(sentences)
         self.model_sanity(model)
 
@@ -91,7 +91,7 @@ class TestFastTextModel(unittest.TestCase):
         self.assertEqual(sims, sims2)
 
         # build vocab and train in one step; must be the same as above
-        model2 = FT_gensim(sentences, size=12, min_count=1, hs=1, negative=0, seed=42, workers=1, bucket=BUCKET)
+        model2 = FT_gensim(sentences, vector_size=12, min_count=1, hs=1, negative=0, seed=42, workers=1, bucket=BUCKET)
         self.models_equal(model, model2)
 
         # verify oov-word vector retrieval
@@ -102,7 +102,7 @@ class TestFastTextModel(unittest.TestCase):
         self.assertEqual(len(oov_vec), 12)
 
     def testFastTextTrainParameters(self):
-        model = FT_gensim(size=12, min_count=1, hs=1, negative=0, seed=42, workers=1, bucket=BUCKET)
+        model = FT_gensim(vector_size=12, min_count=1, hs=1, negative=0, seed=42, workers=1, bucket=BUCKET)
         model.build_vocab(corpus_iterable=sentences)
 
         self.assertRaises(TypeError, model.train, corpus_file=11111)
@@ -115,7 +115,7 @@ class TestFastTextModel(unittest.TestCase):
         with temporary_file(get_tmpfile('gensim_fasttext.tst')) as corpus_file:
             utils.save_as_line_sentence(sentences, corpus_file)
 
-            model = FT_gensim(size=12, min_count=1, hs=1, negative=0, seed=42, workers=1, bucket=BUCKET)
+            model = FT_gensim(vector_size=12, min_count=1, hs=1, negative=0, seed=42, workers=1, bucket=BUCKET)
             model.build_vocab(corpus_file=corpus_file)
             self.model_sanity(model)
 
@@ -403,7 +403,7 @@ class TestFastTextModel(unittest.TestCase):
     def test_cbow_hs_training(self):
 
         model_gensim = FT_gensim(
-            size=48, sg=0, cbow_mean=1, alpha=0.05, window=5, hs=1, negative=0,
+            vector_size=48, sg=0, cbow_mean=1, alpha=0.05, window=5, hs=1, negative=0,
             min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
             sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET)
 
@@ -432,7 +432,7 @@ class TestFastTextModel(unittest.TestCase):
     def test_cbow_hs_training_fromfile(self):
         with temporary_file(get_tmpfile('gensim_fasttext.tst')) as corpus_file:
             model_gensim = FT_gensim(
-                size=48, sg=0, cbow_mean=1, alpha=0.05, window=5, hs=1, negative=0,
+                vector_size=48, sg=0, cbow_mean=1, alpha=0.05, window=5, hs=1, negative=0,
                 min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
                 sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET * 4)
 
@@ -465,7 +465,7 @@ class TestFastTextModel(unittest.TestCase):
     def test_sg_hs_training(self):
 
         model_gensim = FT_gensim(
-            size=48, sg=1, cbow_mean=1, alpha=0.025, window=5, hs=1, negative=0,
+            vector_size=48, sg=1, cbow_mean=1, alpha=0.025, window=5, hs=1, negative=0,
             min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
             sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET)
 
@@ -494,7 +494,7 @@ class TestFastTextModel(unittest.TestCase):
     def test_sg_hs_training_fromfile(self):
         with temporary_file(get_tmpfile('gensim_fasttext.tst')) as corpus_file:
             model_gensim = FT_gensim(
-                size=48, sg=1, cbow_mean=1, alpha=0.025, window=5, hs=1, negative=0,
+                vector_size=48, sg=1, cbow_mean=1, alpha=0.025, window=5, hs=1, negative=0,
                 min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
                 sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET)
 
@@ -527,7 +527,7 @@ class TestFastTextModel(unittest.TestCase):
     def test_cbow_neg_training(self):
 
         model_gensim = FT_gensim(
-            size=48, sg=0, cbow_mean=1, alpha=0.05, window=5, hs=0, negative=5,
+            vector_size=48, sg=0, cbow_mean=1, alpha=0.05, window=5, hs=0, negative=5,
             min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
             sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET)
 
@@ -556,7 +556,7 @@ class TestFastTextModel(unittest.TestCase):
     def test_cbow_neg_training_fromfile(self):
         with temporary_file(get_tmpfile('gensim_fasttext.tst')) as corpus_file:
             model_gensim = FT_gensim(
-                size=48, sg=0, cbow_mean=1, alpha=0.05, window=5, hs=0, negative=5,
+                vector_size=48, sg=0, cbow_mean=1, alpha=0.05, window=5, hs=0, negative=5,
                 min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
                 sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET)
 
@@ -589,7 +589,7 @@ class TestFastTextModel(unittest.TestCase):
     def test_sg_neg_training(self):
 
         model_gensim = FT_gensim(
-            size=48, sg=1, cbow_mean=1, alpha=0.025, window=5, hs=0, negative=5,
+            vector_size=48, sg=1, cbow_mean=1, alpha=0.025, window=5, hs=0, negative=5,
             min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
             sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET * 4)
 
@@ -618,7 +618,7 @@ class TestFastTextModel(unittest.TestCase):
     def test_sg_neg_training_fromfile(self):
         with temporary_file(get_tmpfile('gensim_fasttext.tst')) as corpus_file:
             model_gensim = FT_gensim(
-                size=48, sg=1, cbow_mean=1, alpha=0.025, window=5, hs=0, negative=5,
+                vector_size=48, sg=1, cbow_mean=1, alpha=0.025, window=5, hs=0, negative=5,
                 min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
                 sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET * 4)
 
@@ -649,7 +649,7 @@ class TestFastTextModel(unittest.TestCase):
             self.assertGreaterEqual(overlap_count, 2)
 
     def test_online_learning(self):
-        model_hs = FT_gensim(sentences, size=12, min_count=1, seed=42, hs=1, negative=0, bucket=BUCKET)
+        model_hs = FT_gensim(sentences, vector_size=12, min_count=1, seed=42, hs=1, negative=0, bucket=BUCKET)
         self.assertTrue(len(model_hs.wv.vocab), 12)
         self.assertTrue(model_hs.wv.vocab['graph'].count, 3)
         model_hs.build_vocab(new_sentences, update=True)  # update vocab
@@ -664,7 +664,7 @@ class TestFastTextModel(unittest.TestCase):
             utils.save_as_line_sentence(new_sentences, new_corpus_file)
 
             model_hs = FT_gensim(
-                corpus_file=corpus_file, size=12, min_count=1, seed=42, hs=1, negative=0, bucket=BUCKET)
+                corpus_file=corpus_file, vector_size=12, min_count=1, seed=42, hs=1, negative=0, bucket=BUCKET)
             self.assertTrue(len(model_hs.wv.vocab), 12)
             self.assertTrue(model_hs.wv.vocab['graph'].count, 3)
             model_hs.build_vocab(corpus_file=new_corpus_file, update=True)  # update vocab
@@ -674,7 +674,7 @@ class TestFastTextModel(unittest.TestCase):
 
     def test_online_learning_after_save(self):
         tmpf = get_tmpfile('gensim_fasttext.tst')
-        model_neg = FT_gensim(sentences, size=12, min_count=0, seed=42, hs=0, negative=5, bucket=BUCKET)
+        model_neg = FT_gensim(sentences, vector_size=12, min_count=0, seed=42, hs=0, negative=5, bucket=BUCKET)
         model_neg.save(tmpf)
         model_neg = FT_gensim.load(tmpf)
         self.assertTrue(len(model_neg.wv.vocab), 12)
@@ -690,7 +690,7 @@ class TestFastTextModel(unittest.TestCase):
 
             tmpf = get_tmpfile('gensim_fasttext.tst')
             model_neg = FT_gensim(
-                corpus_file=corpus_file, size=12, min_count=0, seed=42, hs=0, negative=5, bucket=BUCKET)
+                corpus_file=corpus_file, vector_size=12, min_count=0, seed=42, hs=0, negative=5, bucket=BUCKET)
             model_neg.save(tmpf)
             model_neg = FT_gensim.load(tmpf)
             self.assertTrue(len(model_neg.wv.vocab), 12)
@@ -747,7 +747,7 @@ class TestFastTextModel(unittest.TestCase):
         self.online_sanity(model)
 
     def test_get_vocab_word_vecs(self):
-        model = FT_gensim(size=12, min_count=1, seed=42, bucket=BUCKET)
+        model = FT_gensim(vector_size=12, min_count=1, seed=42, bucket=BUCKET)
         model.build_vocab(sentences)
         original_syn0_vocab = np.copy(model.wv.vectors_vocab)
         model.wv.adjust_vectors()
@@ -756,21 +756,21 @@ class TestFastTextModel(unittest.TestCase):
     def test_persistence_word2vec_format(self):
         """Test storing/loading the model in word2vec format."""
         tmpf = get_tmpfile('gensim_fasttext_w2v_format.tst')
-        model = FT_gensim(sentences, min_count=1, size=12, bucket=BUCKET)
+        model = FT_gensim(sentences, min_count=1, vector_size=12, bucket=BUCKET)
         model.wv.save_word2vec_format(tmpf, binary=True)
         loaded_model_kv = KeyedVectors.load_word2vec_format(tmpf, binary=True)
         self.assertEqual(len(model.wv.vocab), len(loaded_model_kv.vocab))
         self.assertTrue(np.allclose(model.wv['human'], loaded_model_kv['human']))
 
     def test_bucket_ngrams(self):
-        model = FT_gensim(size=12, min_count=1, bucket=20)
+        model = FT_gensim(vector_vector_size=12, min_count=1, bucket=20)
         model.build_vocab(sentences)
         self.assertEqual(model.wv.vectors_ngrams.shape, (20, 12))
         model.build_vocab(new_sentences, update=True)
         self.assertEqual(model.wv.vectors_ngrams.shape, (20, 12))
 
     def test_estimate_memory(self):
-        model = FT_gensim(sg=1, hs=1, size=12, negative=5, min_count=3, bucket=BUCKET)
+        model = FT_gensim(sg=1, hs=1, vector_size=12, negative=5, min_count=3, bucket=BUCKET)
         model.build_vocab(sentences)
         report = model.estimate_memory()
         self.assertEqual(report['vocab'], 2800)
@@ -821,7 +821,7 @@ def train_gensim(bucket=100, min_count=5):
     #
     # Set parameters to match those in the load_native function
     #
-    model = FT_gensim(bucket=bucket, size=5, alpha=0.05, workers=1, sample=0.0001, min_count=min_count)
+    model = FT_gensim(bucket=bucket, vector_size=5, alpha=0.05, workers=1, sample=0.0001, min_count=min_count)
     model.build_vocab(TOY_SENTENCES)
     model.train(TOY_SENTENCES, total_examples=len(TOY_SENTENCES), epochs=model.epochs)
     return model

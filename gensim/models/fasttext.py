@@ -37,7 +37,7 @@ Initialize and train a model:
     ['human', 'interface', 'computer']
     >>> print(len(common_texts))
     9
-    >>> model = FastText(size=4, window=3, min_count=1)  # instantiate
+    >>> model = FastText(vector_size=4, window=3, min_count=1)  # instantiate
     >>> model.build_vocab(sentences=common_texts)
     >>> model.train(sentences=common_texts, total_examples=len(common_texts), epochs=10)  # train
 
@@ -50,7 +50,7 @@ in a single line:
 
 .. sourcecode:: pycon
 
-    >>> model2 = FastText(size=4, window=3, min_count=1, sentences=common_texts, iter=10)
+    >>> model2 = FastText(vector_size=4, window=3, min_count=1, sentences=common_texts, iter=10)
 
 .. Important::
     This style of initialize-and-train in a single line is **deprecated**. We include it here
@@ -84,7 +84,7 @@ Passing a corpus is simple:
     >>> from gensim.test.utils import datapath
     >>>
     >>> corpus_file = datapath('lee_background.cor')  # absolute path to corpus
-    >>> model3 = FastText(size=4, window=3, min_count=1)
+    >>> model3 = FastText(vector_size=4, window=3, min_count=1)
     >>> model3.build_vocab(corpus_file=corpus_file)  # scan over corpus to build the vocabulary
     >>>
     >>> total_words = model3.corpus_total_words  # number of words in the corpus
@@ -116,7 +116,7 @@ Gensim will take care of the rest:
     ...                 yield list(tokenize(line))
     >>>
     >>>
-    >>> model4 = FastText(size=4, window=3, min_count=1)
+    >>> model4 = FastText(vector_size=4, window=3, min_count=1)
     >>> model4.build_vocab(sentences=MyIter())
     >>> total_examples = model4.corpus_count
     >>> model4.train(sentences=MyIter(), total_examples=total_examples, epochs=5)
@@ -309,9 +309,10 @@ except ImportError:
 
 
 class FastText(Word2Vec):
-    def __init__(self, sentences=None, corpus_file=None, sg=0, hs=0, size=100, alpha=0.025, window=5, min_count=5,
+    def __init__(self, sentences=None, corpus_file=None, sg=0, hs=0, vector_size=100, alpha=0.025,
+                 window=5, min_count=5,
                  max_vocab_size=None, word_ngrams=1, sample=1e-3, seed=1, workers=3, min_alpha=0.0001,
-                 negative=5, ns_exponent=0.75, cbow_mean=1, hashfxn=hash, iter=5, null_word=0, min_n=3, max_n=6,
+                 negative=5, ns_exponent=0.75, cbow_mean=1, hashfxn=hash, epochs=5, null_word=0, min_n=3, max_n=6,
                  sorted_vocab=1, bucket=2000000, trim_rule=None, batch_words=MAX_WORDS_IN_BATCH, callbacks=(),
                  compatible_hash=True):
         """Train, use and evaluate word representations learned using the method
@@ -466,13 +467,12 @@ class FastText(Word2Vec):
         if self.word_ngrams <= 1 and max_n == 0:
             bucket = 0
 
-        self.wv = FastTextKeyedVectors(size, min_n, max_n, bucket, compatible_hash)
+        self.wv = FastTextKeyedVectors(vector_size, min_n, max_n, bucket, compatible_hash)
         self.bucket = bucket
-#        self.trainables.prepare_weights(hs, negative, self.wv, update=False, vocabulary=self.vocabulary)
         self.wv.bucket = bucket
 
         super(FastText, self).__init__(
-            sentences=sentences, corpus_file=corpus_file, workers=workers, vector_size=size, epochs=iter,
+            sentences=sentences, corpus_file=corpus_file, workers=workers, vector_size=vector_size, epochs=epochs,
             callbacks=callbacks, batch_words=batch_words, trim_rule=trim_rule, sg=sg, alpha=alpha, window=window,
             max_vocab_size=max_vocab_size, min_count=min_count, sample=sample, sorted_vocab=sorted_vocab,
             null_word=null_word, ns_exponent=ns_exponent, hashfxn=hashfxn,
@@ -1066,9 +1066,9 @@ def _load_fasttext_format(model_file, encoding='utf-8', full_model=True):
         m = gensim.models._fasttext_bin.load(fin, encoding=encoding, full_model=full_model)
 
     model = FastText(
-        size=m.dim,
+        vector_size=m.dim,
         window=m.ws,
-        iter=m.epoch,
+        epochs=m.epoch,
         negative=m.neg,
         hs=int(m.loss == 1),
         sg=int(m.model == 2),

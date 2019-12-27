@@ -1979,9 +1979,11 @@ class Word2Vec(utils.SaveLoad):
         except AttributeError as ae:
             if rethrow:
                 raise ae
-            logger.info('Model saved using code from earlier Gensim Version. Re-loading old model in a compatible way.')
-            from gensim.models.deprecated.word2vec import load_old_word2vec
-            return load_old_word2vec(*args, **kwargs)
+            logger.error(
+                "Model load error. Was model saved using code from an older Gensim Version? "
+                "Try loading older model using gensim-3.8.1, then re-saving, to restore "
+                "compatibility with current code.")
+            raise ae
 
 
 class BrownCorpus(object):
