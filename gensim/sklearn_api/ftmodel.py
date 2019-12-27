@@ -162,7 +162,7 @@ class FTTransformer(TransformerMixin, BaseEstimator):
         self.ns_exponent = ns_exponent
         self.cbow_mean = cbow_mean
         self.hashfxn = hashfxn
-        self.spochs = epochs
+        self.epochs = epochs
         self.null_word = null_word
         self.min_n = min_n
         self.max_n = max_n

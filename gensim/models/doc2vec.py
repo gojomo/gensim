@@ -69,7 +69,8 @@ try:
 except ImportError:
     from Queue import Queue  # noqa:F401
 
-from collections import namedtuple, defaultdict, Iterable
+from collections import namedtuple, defaultdict
+from collections.abc import Iterable
 from timeit import default_timer
 from dataclasses import dataclass
 
@@ -963,9 +964,9 @@ class Doc2Vec(Word2Vec):
 
         corpus_count = document_no + 1
         if len(doctags_list) > corpus_count:
-            logger.warn("More unique tags (%i) than documents (%i).", len(doctags_list), corpus_count)
+            logger.warning("More unique tags (%i) than documents (%i).", len(doctags_list), corpus_count)
         if max_rawint > corpus_count:
-            logger.warn(
+            logger.warning(
                 "Highest int doctag (%i) larger than count of documents (%i). This means "
                 "at least %i excess, unused slots (%i bytes) will be allocated for vectors.",
                 max_rawint, corpus_count, ((max_rawint - corpus_count) * self.vector_size * 4))

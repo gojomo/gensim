@@ -132,7 +132,6 @@ from typing import List
 from types import GeneratorType
 import threading
 import itertools
-import warnings
 import copy
 
 from gensim.utils import keep_vocab_item, call_on_class_only, deprecated
@@ -1838,7 +1837,7 @@ class Word2Vec(utils.SaveLoad):
 
         word_vocabs = [self.wv.vocab[w] for w in context_words_list if w in self.wv.vocab]
         if not word_vocabs:
-            warnings.warn("All the input context words are out-of-vocabulary for the current model.")
+            logger.warning("All the input context words are out-of-vocabulary for the current model.")
             return None
 
         word2_indices = [word.index for word in word_vocabs]
