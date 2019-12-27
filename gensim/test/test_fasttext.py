@@ -16,9 +16,7 @@ import numpy as np
 
 from gensim import utils
 from gensim.models.word2vec import LineSentence
-from gensim.models.fasttext import FastText as FT_gensim
-from gensim.models.wrappers.fasttext import FastTextKeyedVectors
-from gensim.models.wrappers.fasttext import FastText as FT_wrapper
+from gensim.models.fasttext import FastText as FT_gensim, FastTextKeyedVectors
 from gensim.models.keyedvectors import KeyedVectors
 from gensim.test.utils import datapath, get_tmpfile, temporary_file, common_texts as sentences
 import gensim.models._fasttext_bin
@@ -775,7 +773,7 @@ class TestFastTextModel(unittest.TestCase):
         self.assertEqual(report['buckets_word'], 640)
         self.assertEqual(report['total'], 6704)
 
-    def testLoadOldModel(self):
+    def obsolete_testLoadOldModel(self):
         """Test loading fasttext models from previous version"""
 
         model_file = 'fasttext_old'

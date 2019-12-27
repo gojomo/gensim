@@ -187,9 +187,6 @@ from six import string_types, integer_types
 from six.moves import zip, range
 from scipy import stats
 
-# For backwards compatibility, see https://github.com/RaRe-Technologies/gensim/issues/2201
-#
-from gensim.models.deprecated.keyedvectors import EuclideanKeyedVectors  # noqa
 
 logger = logging.getLogger(__name__)
 
@@ -1388,6 +1385,7 @@ class KeyedVectors(utils.SaveLoad):
 # to help 3.8.1 & older pickles load properly
 Word2VecKeyedVectors = KeyedVectors
 Doc2VecKeyedVectors = KeyedVectors
+EuclideanKeyedVectors = KeyedVectors
 
 
 def _l2_norm(m, replace=False):

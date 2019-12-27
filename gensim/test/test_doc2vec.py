@@ -102,7 +102,7 @@ class TestDoc2VecModel(unittest.TestCase):
         binary_model_dv = keyedvectors.KeyedVectors.load_word2vec_format(test_word, binary=True)
         self.assertEqual(len(model.wv.vocab), len(binary_model_dv.vocab))
 
-    def testLoadOldModel(self):
+    def obsolete_testLoadOldModel(self):
         """Test loading an old doc2vec model from indeterminate version"""
 
         model_file = 'doc2vec_old'  # which version?!?
@@ -121,7 +121,7 @@ class TestDoc2VecModel(unittest.TestCase):
 
         self.model_sanity(model)
 
-    def testLoadOldModelSeparates(self):
+    def obsolete_testLoadOldModelSeparates(self):
         """Test loading an old doc2vec model from indeterminate version"""
 
         # Model stored in multiple files
@@ -140,7 +140,7 @@ class TestDoc2VecModel(unittest.TestCase):
 
         self.model_sanity(model)
 
-    def test_load_old_models_pre_1_0(self):
+    def obsolete_test_load_old_models_pre_1_0(self):
         """Test loading pre-1.0 models"""
         model_file = 'd2v-lee-v0.13.0'
         model = doc2vec.Doc2Vec.load(datapath(model_file))
@@ -153,7 +153,7 @@ class TestDoc2VecModel(unittest.TestCase):
         for old_version in old_versions:
             self._check_old_version(old_version)
 
-    def test_load_old_models_1_x(self):
+    def obsolete_test_load_old_models_1_x(self):
         """Test loading 1.x models"""
         old_versions = [
             '1.0.0', '1.0.1',
@@ -161,7 +161,7 @@ class TestDoc2VecModel(unittest.TestCase):
         for old_version in old_versions:
             self._check_old_version(old_version)
 
-    def test_load_old_models_2_x(self):
+    def obsolete_test_load_old_models_2_x(self):
         """Test loading 2.x models"""
         old_versions = [
             '2.0.0', '2.1.0', '2.2.0', '2.3.0',
@@ -169,10 +169,18 @@ class TestDoc2VecModel(unittest.TestCase):
         for old_version in old_versions:
             self._check_old_version(old_version)
 
-    def test_load_old_models_3_x(self):
+    def obsolete_test_load_old_models_pre_3_3(self):
         """Test loading 3.x models"""
         old_versions = [
-            '3.0.0', '3.1.0', '3.2.0', '3.3.0', '3.4.0'
+            '3.2.0', '3.1.0', '3.0.0'
+        ]
+        for old_version in old_versions:
+            self._check_old_version(old_version)
+
+    def obsolete_test_load_old_models_post_3_2(self):
+        """Test loading 3.x models"""
+        old_versions = [
+            '3.4.0', '3.3.0',
         ]
         for old_version in old_versions:
             self._check_old_version(old_version)
