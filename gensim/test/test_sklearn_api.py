@@ -1297,7 +1297,7 @@ class TestPhrasesTransformerCustomScorer(unittest.TestCase):
         self.assertRaises(NotFittedError, phrases_transformer.transform, phrases_sentences[0])
 
 
-class TestFastTextWrapper(unittest.TestCase):
+class TestFTTransformer(unittest.TestCase):
     def setUp(self):
         self.model = FTTransformer(vector_size=10, min_count=0, seed=42, bucket=5000)
         self.model.fit(texts)
