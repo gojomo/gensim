@@ -25,7 +25,7 @@ from gensim.test.utils import common_texts
 
 class TestKerasWord2VecWrapper(unittest.TestCase):
     def setUp(self):
-        self.model_cos_sim = word2vec.Word2Vec(common_texts, size=100, min_count=1, hs=1)
+        self.model_cos_sim = word2vec.Word2Vec(common_texts, vector_size=100, min_count=1, hs=1)
         self.model_twenty_ng = word2vec.Word2Vec(min_count=1)
 
     def testWord2VecTraining(self):
