@@ -780,10 +780,12 @@ class Doc2Vec(Word2Vec):
         """
         try:
             return super(Doc2Vec, cls).load(*args, rethrow=True, **kwargs)
-        except AttributeError:
-            logger.info('Model saved using code from earlier Gensim Version. Re-loading old model in a compatible way.')
-            from gensim.models.deprecated.doc2vec import load_old_doc2vec
-            return load_old_doc2vec(*args, **kwargs)
+        except AttributeError as ae:
+            logger.error(
+                "Model load error. Was model saved using code from an older Gensim Version? "
+                "Try loading older model using gensim-3.8.1, then re-saving, to restore "
+                "compatibility with current code.")
+            raise ae
 
     def estimate_memory(self, vocab_size=None, report=None):
         """Estimate required memory for a model using current settings.
