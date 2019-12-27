@@ -1939,6 +1939,9 @@ class Word2Vec(utils.SaveLoad):
         """
         try:
             model = super(Word2Vec, cls).load(*args, **kwargs)
+            if not isinstance(model, Word2Vec):
+                rethrow = True
+                raise AttributeError("Model of type %s can't be loaded by %s" % (type(model), str(cls)))
             # for backward compatibility
             if not hasattr(model, 'ns_exponent'):
                 model.ns_exponent = 0.75
