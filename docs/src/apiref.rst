@@ -61,12 +61,6 @@ Modules:
     models/wrappers/ldavowpalwabbit.rst
     models/wrappers/wordrank
     models/wrappers/varembed
-    models/wrappers/fasttext
-    models/deprecated/doc2vec
-    models/deprecated/fasttext
-    models/deprecated/word2vec
-    models/deprecated/keyedvectors
-    models/deprecated/fasttext_wrapper
     similarities/docsim
     similarities/termsim
     similarities/index

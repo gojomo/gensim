@@ -1039,8 +1039,8 @@ def load_facebook_vectors(path, encoding='utf-8'):
     model training.
 
     """
-    model_wrapper = _load_fasttext_format(path, encoding=encoding, full_model=False)
-    return model_wrapper.wv
+    full_model = _load_fasttext_format(path, encoding=encoding, full_model=False)
+    return full_model.wv
 
 
 def _load_fasttext_format(model_file, encoding='utf-8', full_model=True):
