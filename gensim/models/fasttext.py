@@ -768,7 +768,7 @@ class FastText(Word2Vec):
             raise TypeError("sentences must be an iterable of list, got %r instead" % corpus_iterable)
 
         if self.wv.buckets_word is None:
-            logger.warn("self.wv.buckets_word was None; fixing.")
+            logger.warning("self.wv.buckets_word was None; fixing.")
             self.old_vocab_len = len(self.wv.vocab)
             self.wv.init_ngrams_weights(seed=self.seed)
 
