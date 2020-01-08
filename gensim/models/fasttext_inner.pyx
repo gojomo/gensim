@@ -301,8 +301,8 @@ cdef void fasttext_fast_sentence_cbow_neg(FastTextConfig *c, int i, int j, int k
     cdef REAL_t f, g, count, inv_count = 1.0, label, f_dot
     cdef np.uint32_t target_index, word_index
     cdef int d, m
-    cdef REAL_t exp_ind_real
-    cdef int exp_ind_int
+#    cdef REAL_t exp_ind_real
+#    cdef int exp_ind_int
 
     word_index = indexes[i]
 
