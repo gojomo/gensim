@@ -34,7 +34,7 @@ class TestKerasWord2VecWrapper(unittest.TestCase):
         """
         model = self.model_cos_sim
         self.assertTrue(model.wv.vectors.shape == (len(model.wv.vocab), 100))
-        self.assertTrue(model.trainables.syn1.shape == (len(model.wv.vocab), 100))
+        self.assertTrue(model.syn1.shape == (len(model.wv.vocab), 100))
         sims = model.wv.most_similar('graph', topn=10)
         # self.assertTrue(sims[0][0] == 'trees', sims)  # most similar
 
