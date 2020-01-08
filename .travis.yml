@@ -31,8 +31,8 @@ matrix:
       #sudo: true
       dist: xenial
 
-    - python: '3.6'
-      env: TOXENV="py36-linux"
+#    - python: '3.6'
+#      env: TOXENV="py36-linux"
 
 
 install:
