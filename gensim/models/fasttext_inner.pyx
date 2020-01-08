@@ -340,7 +340,7 @@ cdef void fasttext_fast_sentence_cbow_neg(FastTextConfig *c, int i, int j, int k
         if f_dot <= -MAX_EXP or f_dot >= MAX_EXP:
             continue
         exp_ind_real = (f_dot + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2)
-	exp_ind_int = <int>exp_ind_real
+        exp_ind_int = <int>exp_ind_real
 
         f = EXP_TABLE[exp_ind_int]
 #        f = EXP_TABLE[<int>((f_dot + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))]
