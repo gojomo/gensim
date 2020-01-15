@@ -602,12 +602,13 @@ class TestDoc2VecModel(unittest.TestCase):
             self.model_sanity(model)
 
     def test_parallel(self):
-        """Test doc2vec parallel training."""
-        corpus = utils.RepeatCorpus(DocsLeeCorpus(), 10000)
+        """Test doc2vec parallel training with more than default 3 threads."""
+        # repeat the ~300 doc (~60000 word) Lee corpus to get 6000 docs (~1.2M words)
+        corpus = utils.RepeatCorpus(DocsLeeCorpus(), 6000)
 
-        for workers in [2, 4]:
-            model = doc2vec.Doc2Vec(corpus, workers=workers)
-            self.model_sanity(model)
+        # use smaller batches-to-workers for more contention
+        model = doc2vec.Doc2Vec(corpus, workers=6, batch_words=5000)
+        self.model_sanity(model)
 
     def test_deterministic_hs(self):
         """Test doc2vec results identical with identical RNG seed."""
