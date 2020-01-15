@@ -1,3 +1,4 @@
+import logging
 import unittest
 import numpy
 import codecs
@@ -518,7 +519,8 @@ class TestLsiWrapper(unittest.TestCase):
 class TestLdaSeqWrapper(unittest.TestCase):
     def setUp(self):
         self.model = LdaSeqTransformer(
-            id2word=dictionary_ldaseq, num_topics=2, time_slice=[10, 10, 11], initialize='gensim'
+            id2word=dictionary_ldaseq, num_topics=2, time_slice=[10, 10, 11], initialize='gensim',
+            passes=2, lda_inference_max_iter=10, em_min_iter=1, em_max_iter=4
         )
         self.model.fit(corpus_ldaseq)
 
@@ -546,7 +548,10 @@ class TestLdaSeqWrapper(unittest.TestCase):
         test_target = data.target[0:2]
         id2word = Dictionary([x.split() for x in test_data])
         corpus = [id2word.doc2bow(i.split()) for i in test_data]
-        model = LdaSeqTransformer(id2word=id2word, num_topics=2, time_slice=[1, 1, 1], initialize='gensim')
+        model = LdaSeqTransformer(
+            id2word=id2word, num_topics=2, time_slice=[1, 1, 1], initialize='gensim',
+            passes=2, lda_inference_max_iter=10, em_min_iter=1, em_max_iter=4
+        )
         clf = linear_model.LogisticRegression(penalty='l2', C=0.1)
         text_ldaseq = Pipeline([('features', model,), ('classifier', clf)])
         text_ldaseq.fit(corpus, test_target)
@@ -579,7 +584,10 @@ class TestLdaSeqWrapper(unittest.TestCase):
         self.assertTrue(passed)
 
     def testModelNotFitted(self):
-        ldaseq_wrapper = LdaSeqTransformer(num_topics=2)
+        ldaseq_wrapper = LdaSeqTransformer(
+            num_topics=2,
+            passes=2, lda_inference_max_iter=10, em_min_iter=1, em_max_iter=4
+        )
         doc = list(corpus_ldaseq)[0]
         self.assertRaises(NotFittedError, ldaseq_wrapper.transform, doc)
 
@@ -1402,4 +1410,5 @@ class TestFTTransformer(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.DEBUG)
     unittest.main()
