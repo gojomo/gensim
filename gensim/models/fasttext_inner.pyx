@@ -489,8 +489,8 @@ cdef object populate_ft_config(FastTextConfig *c, vocab, buckets_word, sentences
         A pointer to the struct that will contain the populated indices.
     vocab : dict
         The vocabulary
-    buckets_word : dict
-        A map containing the buckets each word appears in
+    buckets_word : list
+        A list containing the buckets each word appears in
     sentences : iterable
         The sentences to read
 
