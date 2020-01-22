@@ -61,8 +61,8 @@ from word2vec_inner cimport bisect_left, random_int32, scopy, sscal, \
 DEF MAX_SENTENCE_LEN = 10000
 DEF MAX_SUBWORDS = 1000
 
-DEF EXP_TABLE_SIZE = 1000
-DEF MAX_EXP = 6
+DEF EXP_TABLE_SIZE = 512
+DEF MAX_EXP = 8
 
 cdef REAL_t[EXP_TABLE_SIZE] EXP_TABLE
 cdef REAL_t[EXP_TABLE_SIZE] LOG_TABLE
@@ -325,9 +325,12 @@ cdef void fasttext_fast_sentence_cbow_neg(FastTextConfig *c, int i, int j, int k
 
         row2 = target_index * size
         f_dot = our_dot(&size, neu1, &ONE, &syn1neg[row2], &ONE)
-        if f_dot <= -MAX_EXP or f_dot >= MAX_EXP:
-            continue
-        f = EXP_TABLE[<int>((f_dot + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))]
+        if f_dot <= -MAX_EXP:
+            f = 0.0
+        elif f_dot >= MAX_EXP:
+            f = 1.0
+        else:
+            f = EXP_TABLE[<int>((f_dot + MAX_EXP) * (EXP_TABLE_SIZE / MAX_EXP / 2))]
         g = (label - f) * alpha
 
         our_saxpy(&size, &g, &syn1neg[row2], &ONE, work, &ONE)
