@@ -864,26 +864,21 @@ class FastText(Word2Vec):
             Save :class:`~gensim.models.fasttext.FastText` model.
 
         """
-        try:
-            model = super(FastText, cls).load(*args, rethrow=True, **kwargs)
+        model = super(FastText, cls).load(*args, rethrow=True, **kwargs)
 
-            if not hasattr(model.wv, 'vectors_vocab_lockf') and hasattr(model.wv, 'vectors_vocab'):
-                # TODO: try trainables-location
-                model.wv.vectors_vocab_lockf = ones(len(model.wv.vectors_vocab), dtype=REAL)
-            if not hasattr(model, 'vectors_ngrams_lockf') and hasattr(model.wv, 'vectors_ngrams'):
-                # TODO: try trainables-location
-                model.wv.vectors_ngrams_lockf = ones(len(model.wv.vectors_ngrams), dtype=REAL)
-            # fixup mistakenly overdimensioned gensim-3.x lockf arrays
-            if len(model.wv.vectors_vocab_lockf.shape) > 1:
-                model.wv.vectors_vocab_lockf = model.wv.vectors_vocab_lockf[:, 0]
-            if len(model.wv.vectors_ngrams_lockf.shape) > 1:
-                model.wv.vectors_ngrams_lockf = model.wv.vectors_ngrams_lockf[:, 0]
-            if not hasattr(model, 'bucket'):
-                model.bucket = model.wv.bucket
-        except AttributeError:
-            logger.info('Model saved using code from earlier Gensim Version. Re-loading old model in a compatible way.')
-            from gensim.models.deprecated.fasttext import load_old_fasttext
-            model = load_old_fasttext(*args, **kwargs)
+        if not hasattr(model.wv, 'vectors_vocab_lockf') and hasattr(model.wv, 'vectors_vocab'):
+            # TODO: try trainables-location
+            model.wv.vectors_vocab_lockf = ones(len(model.wv.vectors_vocab), dtype=REAL)
+        if not hasattr(model, 'vectors_ngrams_lockf') and hasattr(model.wv, 'vectors_ngrams'):
+            # TODO: try trainables-location
+            model.wv.vectors_ngrams_lockf = ones(len(model.wv.vectors_ngrams), dtype=REAL)
+        # fixup mistakenly overdimensioned gensim-3.x lockf arrays
+        if len(model.wv.vectors_vocab_lockf.shape) > 1:
+            model.wv.vectors_vocab_lockf = model.wv.vectors_vocab_lockf[:, 0]
+        if len(model.wv.vectors_ngrams_lockf.shape) > 1:
+            model.wv.vectors_ngrams_lockf = model.wv.vectors_ngrams_lockf[:, 0]
+        if not hasattr(model, 'bucket'):
+            model.bucket = model.wv.bucket
 
         _try_upgrade(model.wv)
         if not hasattr(model.wv, 'buckets_word') or not model.wv.buckets_word:
