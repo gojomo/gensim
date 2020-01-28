@@ -233,7 +233,7 @@ cdef init_d2v_config(Doc2VecConfig *c, model, alpha, learn_doctags, learn_words,
     c[0].learn_hidden = learn_hidden
     c[0].alpha = alpha
     c[0].layer1_size = model.layer1_size
-    c[0].vector_size = model.docvecs.vector_size
+    c[0].vector_size = model.dv.vector_size
     c[0].workers = model.workers
     c[0].docvecs_count = docvecs_count
 
@@ -248,13 +248,13 @@ cdef init_d2v_config(Doc2VecConfig *c, model, alpha, learn_doctags, learn_words,
        word_vectors = model.wv.vectors
     c[0].word_vectors = <REAL_t *>(np.PyArray_DATA(word_vectors))
     if doctag_vectors is None:
-       doctag_vectors = model.docvecs.vectors_docs
+       doctag_vectors = model.dv.vectors_docs
     c[0].doctag_vectors = <REAL_t *>(np.PyArray_DATA(doctag_vectors))
     if word_locks is None:
        word_locks = model.wv.vectors_lockf
     c[0].word_locks = <REAL_t *>(np.PyArray_DATA(word_locks))
     if doctag_locks is None:
-       doctag_locks = model.docvecs.vectors_lockf
+       doctag_locks = model.dv.vectors_lockf
     c[0].doctag_locks = <REAL_t *>(np.PyArray_DATA(doctag_locks))
 
     if c[0].hs:
