@@ -1568,10 +1568,10 @@ class SaveFacebookFormatModelTest(unittest.TestCase):
         self.assertEqual(model_trained.negative, model_loaded.negative)
         self.assertEqual(model_trained.hs, model_loaded.hs)
         self.assertEqual(model_trained.sg, model_loaded.sg)
-        self.assertEqual(model_trained.trainables.bucket, model_loaded.trainables.bucket)
+        self.assertEqual(model_trained.bucket, model_loaded.bucket)
         self.assertEqual(model_trained.wv.min_n, model_loaded.wv.min_n)
         self.assertEqual(model_trained.wv.max_n, model_loaded.wv.max_n)
-        self.assertEqual(model_trained.vocabulary.sample, model_loaded.vocabulary.sample)
+        self.assertEqual(model_trained.sample, model_loaded.sample)
         self.assertEqual(set(model_trained.wv.index2word), set(model_loaded.wv.index2word))
 
         for w in model_trained.wv.index2word:
