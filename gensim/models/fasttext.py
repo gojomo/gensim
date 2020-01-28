@@ -1102,7 +1102,8 @@ def _check_model(m):
         'mismatch between vector size in model params ({}) and model vectors ({})'
         .format(m.wv.vector_size, m.wv.vectors_ngrams)
     )
-    if m.syn1neg is not None:
+
+    if hasattr(m, 'syn1neg') and m.syn1neg is not None:
         assert m.wv.vector_size == m.syn1neg.shape[1], (
             'mismatch between vector size in model params ({}) and trainables ({})'
             .format(m.wv.vector_size, m.wv.vectors_ngrams)
