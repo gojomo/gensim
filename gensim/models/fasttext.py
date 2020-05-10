@@ -505,8 +505,8 @@ class FastText(Word2Vec):
         assert num_vectors > 0, 'expected num_vectors to be initialized already'
         assert vocab_size > 0, 'expected vocab_size to be initialized already'
 
+        self.wv.vectors_vocab_lockf = ones(len(self.wv.vectors_vocab), dtype=REAL)
         self.wv.vectors_ngrams_lockf = ones(len(self.wv.vectors_ngrams), dtype=REAL)
-        self.wv.vectors_vocab_lockf = ones(len(self.wv.vectors_vocab.shape), dtype=REAL)
 
         if self.hs:
             self.syn1 = hidden_output
