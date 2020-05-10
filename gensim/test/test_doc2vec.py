@@ -533,7 +533,9 @@ class TestDoc2VecModel(unittest.TestCase):
 
     def test_dbow_neg(self):
         """Test DBOW doc2vec training."""
-        model = doc2vec.Doc2Vec(list_corpus, dm=0, hs=0, negative=10, min_count=2, epochs=20)
+        model = doc2vec.Doc2Vec(
+            list_corpus, dm=0, vector_size=24, hs=0, negative=10, min_count=2,
+            epochs=20)
         self.model_sanity(model)
 
     @unittest.skipIf(os.name == 'nt' and six.PY2, "corpus_file training is not supported on Windows + Py27")
@@ -541,7 +543,9 @@ class TestDoc2VecModel(unittest.TestCase):
         """Test DBOW doc2vec training."""
         with temporary_file(get_tmpfile('gensim_doc2vec.tst')) as corpus_file:
             save_lee_corpus_as_line_sentence(corpus_file)
-            model = doc2vec.Doc2Vec(list_corpus, dm=0, hs=0, negative=10, min_count=2, epochs=20)
+            model = doc2vec.Doc2Vec(
+                list_corpus, dm=0, vector_size=24, hs=0, negative=10, min_count=2,
+                epochs=20)
             self.model_sanity(model)
 
     def test_dmm_neg(self):
