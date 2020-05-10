@@ -1701,7 +1701,7 @@ class SaveFacebookFormatReadingTest(unittest.TestCase):
     def test_cbow(self):
         self._check_load_fasttext_format(sg=0)
 
-        
+
 class TestFastTextKeyedVectors(unittest.TestCase):
     def test_ft_kv_backward_compat_w_360(self):
         kv = KeyedVectors.load(datapath("ft_kv_3.6.0.model.gz"))

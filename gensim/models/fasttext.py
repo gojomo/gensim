@@ -1167,7 +1167,7 @@ def save_facebook_model(model, path, encoding="utf-8", lr_update_rate=100, word_
     fb_fasttext_parameters = {"lr_update_rate": lr_update_rate, "word_ngrams": word_ngrams}
     gensim.models._fasttext_bin.save(model, path, fb_fasttext_parameters, encoding)
 
-    
+
 class FastTextKeyedVectors(KeyedVectors):
     def __init__(self, vector_size, min_n, max_n, bucket, compatible_hash):
         """Vectors and vocab for :class:`~gensim.models.fasttext.FastText`.
