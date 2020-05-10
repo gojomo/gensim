@@ -1339,7 +1339,7 @@ class TestFTTransformer(unittest.TestCase):
         self.model.fit(texts)
 
         # training a Gensim FastText model with the same params
-        gensim_ftmodel = models.FastText(texts, size=10, min_count=0, seed=42, workers=1, bucket=5000)
+        gensim_ftmodel = models.FastText(texts, vector_size=10, min_count=0, seed=42, workers=1, bucket=5000)
 
         # vectors returned by FTTransformer
         vecs_transformer_api = self.model.transform(
