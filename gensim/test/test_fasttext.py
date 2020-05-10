@@ -404,7 +404,7 @@ class TestFastTextModel(unittest.TestCase):
 
         model_gensim = FT_gensim(
             vector_size=48, sg=0, cbow_mean=1, alpha=0.05, window=5, hs=1, negative=0,
-            min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
+            min_count=5, epochs=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
             sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET)
 
         lee_data = LineSentence(datapath('lee_background.cor'))
@@ -433,7 +433,7 @@ class TestFastTextModel(unittest.TestCase):
         with temporary_file(get_tmpfile('gensim_fasttext.tst')) as corpus_file:
             model_gensim = FT_gensim(
                 vector_size=48, sg=0, cbow_mean=1, alpha=0.05, window=5, hs=1, negative=0,
-                min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
+                min_count=5, epochs=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
                 sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET * 4)
 
             lee_data = LineSentence(datapath('lee_background.cor'))
@@ -466,7 +466,7 @@ class TestFastTextModel(unittest.TestCase):
 
         model_gensim = FT_gensim(
             vector_size=48, sg=1, cbow_mean=1, alpha=0.025, window=5, hs=1, negative=0,
-            min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
+            min_count=5, epochs=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
             sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET)
 
         lee_data = LineSentence(datapath('lee_background.cor'))
@@ -495,7 +495,7 @@ class TestFastTextModel(unittest.TestCase):
         with temporary_file(get_tmpfile('gensim_fasttext.tst')) as corpus_file:
             model_gensim = FT_gensim(
                 vector_size=48, sg=1, cbow_mean=1, alpha=0.025, window=5, hs=1, negative=0,
-                min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
+                min_count=5, epochs=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
                 sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET)
 
             lee_data = LineSentence(datapath('lee_background.cor'))
@@ -528,7 +528,7 @@ class TestFastTextModel(unittest.TestCase):
 
         model_gensim = FT_gensim(
             vector_size=48, sg=0, cbow_mean=1, alpha=0.05, window=5, hs=0, negative=5,
-            min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
+            min_count=5, epochs=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
             sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET)
 
         lee_data = LineSentence(datapath('lee_background.cor'))
@@ -557,7 +557,7 @@ class TestFastTextModel(unittest.TestCase):
         with temporary_file(get_tmpfile('gensim_fasttext.tst')) as corpus_file:
             model_gensim = FT_gensim(
                 vector_size=48, sg=0, cbow_mean=1, alpha=0.05, window=5, hs=0, negative=5,
-                min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
+                min_count=5, epochs=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
                 sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET)
 
             lee_data = LineSentence(datapath('lee_background.cor'))
@@ -590,7 +590,7 @@ class TestFastTextModel(unittest.TestCase):
 
         model_gensim = FT_gensim(
             vector_size=48, sg=1, cbow_mean=1, alpha=0.025, window=5, hs=0, negative=5,
-            min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
+            min_count=5, epochs=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
             sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET * 4)
 
         lee_data = LineSentence(datapath('lee_background.cor'))
@@ -619,7 +619,7 @@ class TestFastTextModel(unittest.TestCase):
         with temporary_file(get_tmpfile('gensim_fasttext.tst')) as corpus_file:
             model_gensim = FT_gensim(
                 vector_size=48, sg=1, cbow_mean=1, alpha=0.025, window=5, hs=0, negative=5,
-                min_count=5, iter=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
+                min_count=5, epochs=5, batch_words=1000, word_ngrams=1, sample=1e-3, min_n=3, max_n=6,
                 sorted_vocab=1, workers=1, min_alpha=0.0, bucket=BUCKET * 4)
 
             lee_data = LineSentence(datapath('lee_background.cor'))
@@ -725,16 +725,16 @@ class TestFastTextModel(unittest.TestCase):
         self.assertLess(0., sim)
 
     def test_sg_hs_online(self):
-        model = FT_gensim(sg=1, window=2, hs=1, negative=0, min_count=3, iter=1, seed=42, workers=1, bucket=BUCKET)
+        model = FT_gensim(sg=1, window=2, hs=1, negative=0, min_count=3, epochs=1, seed=42, workers=1, bucket=BUCKET)
         self.online_sanity(model)
 
     def test_sg_neg_online(self):
-        model = FT_gensim(sg=1, window=2, hs=0, negative=5, min_count=3, iter=1, seed=42, workers=1, bucket=BUCKET)
+        model = FT_gensim(sg=1, window=2, hs=0, negative=5, min_count=3, epochs=1, seed=42, workers=1, bucket=BUCKET)
         self.online_sanity(model)
 
     def test_cbow_hs_online(self):
         model = FT_gensim(
-            sg=0, cbow_mean=1, alpha=0.05, window=2, hs=1, negative=0, min_count=3, iter=1, seed=42, workers=1,
+            sg=0, cbow_mean=1, alpha=0.05, window=2, hs=1, negative=0, min_count=3, epochs=1, seed=42, workers=1,
             bucket=BUCKET,
         )
         self.online_sanity(model)
@@ -742,7 +742,7 @@ class TestFastTextModel(unittest.TestCase):
     def test_cbow_neg_online(self):
         model = FT_gensim(
             sg=0, cbow_mean=1, alpha=0.05, window=2, hs=0, negative=5,
-            min_count=5, iter=1, seed=42, workers=1, sample=0, bucket=BUCKET
+            min_count=5, epochs=1, seed=42, workers=1, sample=0, bucket=BUCKET
         )
         self.online_sanity(model)
 
@@ -763,7 +763,7 @@ class TestFastTextModel(unittest.TestCase):
         self.assertTrue(np.allclose(model.wv['human'], loaded_model_kv['human']))
 
     def test_bucket_ngrams(self):
-        model = FT_gensim(vector_vector_size=12, min_count=1, bucket=20)
+        model = FT_gensim(vector_size=12, min_count=1, bucket=20)
         model.build_vocab(sentences)
         self.assertEqual(model.wv.vectors_ngrams.shape, (20, 12))
         model.build_vocab(new_sentences, update=True)
@@ -1523,7 +1523,7 @@ class SaveFacebookFormatModelTest(unittest.TestCase):
     def _check_roundtrip(self, sg):
         model_params = {
             "sg": sg,
-            "size": 10,
+            "vector_size": 12,
             "min_count": 1,
             "hs": 1,
             "negative": 5,
@@ -1541,10 +1541,10 @@ class SaveFacebookFormatModelTest(unittest.TestCase):
         self.assertEqual(model_trained.negative, model_loaded.negative)
         self.assertEqual(model_trained.hs, model_loaded.hs)
         self.assertEqual(model_trained.sg, model_loaded.sg)
-        self.assertEqual(model_trained.trainables.bucket, model_loaded.trainables.bucket)
+        self.assertEqual(model_trained.bucket, model_loaded.bucket)
         self.assertEqual(model_trained.wv.min_n, model_loaded.wv.min_n)
         self.assertEqual(model_trained.wv.max_n, model_loaded.wv.max_n)
-        self.assertEqual(model_trained.vocabulary.sample, model_loaded.vocabulary.sample)
+        self.assertEqual(model_trained.sample, model_loaded.sample)
         self.assertEqual(set(model_trained.wv.index2word), set(model_loaded.wv.index2word))
 
         for w in model_trained.wv.index2word:
@@ -1578,7 +1578,7 @@ class SaveGensimByteIdentityTest(unittest.TestCase):
     def _check_roundtrip_file_file(self, sg):
         model_params = {
             "sg": sg,
-            "size": 10,
+            "vector_size": 12,
             "min_count": 1,
             "hs": 1,
             "negative": 0,
@@ -1607,7 +1607,7 @@ def _save_test_model(out_base_fname, model_params):
     inp_fname = datapath('lee_background.cor')
 
     model_type = "cbow" if model_params["sg"] == 0 else "skipgram"
-    size = str(model_params["size"])
+    size = str(model_params["vector_size"])
     seed = str(model_params["seed"])
 
     cmd = [
@@ -1629,7 +1629,7 @@ class SaveFacebookByteIdentityTest(unittest.TestCase):
     """
 
     def _check_roundtrip_file_file(self, sg):
-        model_params = {"size": 10, "sg": sg, "seed": 42}
+        model_params = {"vector_size": 12, "sg": sg, "seed": 42}
 
         # fasttext tool creates both *vec and *bin files, so we have to remove both, even thought *vec is unused
 
@@ -1678,7 +1678,7 @@ class SaveFacebookFormatReadingTest(unittest.TestCase):
     def _check_load_fasttext_format(self, sg):
         model_params = {
             "sg": sg,
-            "size": 10,
+            "vector_size": 12,
             "min_count": 1,
             "hs": 1,
             "negative": 5,
