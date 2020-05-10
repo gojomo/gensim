@@ -614,12 +614,12 @@ class TestWord2VecModel(unittest.TestCase):
     def testEvaluateWordPairs(self):
         """Test Spearman and Pearson correlation coefficients give sane results on similarity datasets"""
         corpus = word2vec.LineSentence(datapath('head500.noblanks.cor.bz2'))
-        model = word2vec.Word2Vec(corpus, min_count=3, epochs=10)
+        model = word2vec.Word2Vec(corpus, min_count=3, epochs=20)
         correlation = model.wv.evaluate_word_pairs(datapath('wordsim353.tsv'))
         pearson = correlation[0][0]
         spearman = correlation[1][0]
         oov = correlation[2]
-        self.assertTrue(0.1 < pearson < 1.0)
+        self.assertTrue(0.1 < pearson < 1.0, "pearson %f out of 0.1 < p < 1.0 range" % pearson)
         self.assertTrue(0.1 < spearman < 1.0)
         self.assertTrue(0.0 <= oov < 90.0)
 
@@ -629,7 +629,7 @@ class TestWord2VecModel(unittest.TestCase):
         with temporary_file(get_tmpfile('gensim_word2vec.tst')) as tf:
             utils.save_as_line_sentence(word2vec.LineSentence(datapath('head500.noblanks.cor.bz2')), tf)
 
-            model = word2vec.Word2Vec(corpus_file=tf, min_count=3, epochs=10)
+            model = word2vec.Word2Vec(corpus_file=tf, min_count=3, epochs=20)
             correlation = model.wv.evaluate_word_pairs(datapath('wordsim353.tsv'))
             pearson = correlation[0][0]
             spearman = correlation[1][0]
