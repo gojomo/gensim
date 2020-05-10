@@ -267,18 +267,6 @@ class TestKeyedVectors(unittest.TestCase):
             model.get_vector(u'どういたしまして'), np.array([.1, .2, .3], dtype=np.float32)))
 
 
-class L2NormTest(unittest.TestCase):
-    def test(self):
-        m = np.array(range(1, 10), dtype=np.float32)
-        m.shape = (3, 3)
-
-        norm = gensim.models.keyedvectors._l2_norm(m)
-        self.assertFalse(np.allclose(m, norm))
-
-        gensim.models.keyedvectors._l2_norm(m, replace=True)
-        self.assertTrue(np.allclose(m, norm))
-
-
 class Gensim320Test(unittest.TestCase):
     def test(self):
         path = datapath('old_keyedvectors_320.dat')

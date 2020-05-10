@@ -345,20 +345,6 @@ class TestWord2VecModel(unittest.TestCase):
         model = word2vec.Word2Vec(sentences, min_count=1, trim_rule=rule)
         self.assertTrue("human" not in model.wv.vocab)
 
-    def testVectorsNormNotSaved(self):
-        """Test vectors_norm isn't saved in model file"""
-        tmpf = get_tmpfile('gensim_word2vec.tst')
-        model = word2vec.Word2Vec(sentences, min_count=1)
-        model.wv.init_sims()
-        model.save(tmpf)
-        loaded_model = word2vec.Word2Vec.load(tmpf)
-        self.assertTrue(loaded_model.wv.vectors_norm is None)
-
-        wv = model.wv
-        wv.save(tmpf)
-        loaded_kv = keyedvectors.KeyedVectors.load(tmpf)
-        self.assertTrue(loaded_kv.vectors_norm is None)
-
     def obsolete_testLoadPreKeyedVectorModel(self):
         """Test loading pre-KeyedVectors word2vec model"""
 
