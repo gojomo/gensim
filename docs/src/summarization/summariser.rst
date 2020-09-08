@@ -1,8 +1,8 @@
-:mod:`summarization.summarizer` -- TextRank Summarizer
-======================================================
+:mod:`summarization.summarizer` -- TextRank Summariser
+=========================================================
 
 .. automodule:: gensim.summarization.summarizer
-    :synopsis: TextRank Summarizer
+    :synopsis: TextRank Summariser
     :members:
     :inherited-members:
     :undoc-members:

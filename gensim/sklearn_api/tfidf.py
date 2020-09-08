@@ -4,7 +4,7 @@
 # Copyright (C) 2011 Radim Rehurek <radimrehurek@seznam.cz>
 # Licensed under the GNU LGPL v2.1 - http://www.gnu.org/licenses/lgpl.html
 
-"""Scikit-learn interface for :class:`~gensim.models.tfidfmodel.TfidfModel`.
+"""Scikit learn interface for :class:`~gensim.models.tfidfmodel.TfidfModel`.
 
 Follows scikit-learn API conventions to facilitate using gensim along with scikit-learn.
 
@@ -30,7 +30,7 @@ import gensim
 class TfIdfTransformer(TransformerMixin, BaseEstimator):
     """Base TfIdf module, wraps :class:`~gensim.models.tfidfmodel.TfidfModel`.
 
-    For more information see `tf-idf <https://en.wikipedia.org/wiki/Tf%E2%80%93idf>`_.
+    For more information please have a look to `tf-idf <https://en.wikipedia.org/wiki/Tf%E2%80%93idf>`_.
 
     """
     def __init__(self, id2word=None, dictionary=None, wlocal=gensim.utils.identity,
@@ -114,14 +114,12 @@ class TfIdfTransformer(TransformerMixin, BaseEstimator):
         self.pivot = pivot
 
     def fit(self, X, y=None):
-        """Fit the model from the given training data.
+        """Fit the model according to the given training data.
 
         Parameters
         ----------
         X : iterable of iterable of (int, int)
             Input corpus
-        y : None
-            Ignored. TF-IDF is an unsupervised model.
 
         Returns
         -------
@@ -132,22 +130,22 @@ class TfIdfTransformer(TransformerMixin, BaseEstimator):
         self.gensim_model = TfidfModel(
             corpus=X, id2word=self.id2word, dictionary=self.dictionary, wlocal=self.wlocal,
             wglobal=self.wglobal, normalize=self.normalize, smartirs=self.smartirs,
-            pivot=self.pivot, slope=self.slope,
+            pivot=self.pivot, slope=self.slope
         )
         return self
 
     def transform(self, docs):
-        """Get the tf-idf scores for `docs` in a bag-of-words representation.
+        """Get the tf-idf scores in BoW representation for `docs`
 
         Parameters
         ----------
-        docs: {iterable of list of (int, number)}
-            Document or corpus in bag-of-words format.
+        docs: {iterable of list of (int, number), list of (int, number)}
+            Document or corpus in BoW format.
 
         Returns
         -------
         iterable of list (int, float) 2-tuples.
-            The bag-of-words representation of each input document.
+            The BOW representation of each document. Will have  the same shape as `docs`.
 
         """
         if self.gensim_model is None:
@@ -155,7 +153,7 @@ class TfIdfTransformer(TransformerMixin, BaseEstimator):
                 "This model has not been fitted yet. Call 'fit' with appropriate arguments before using this method."
             )
 
-        # Is the input a single document?
+        # input as python lists
         if isinstance(docs[0], tuple):
-            docs = [docs]  # Yes => convert it to a corpus (of 1 document).
+            docs = [docs]
         return [self.gensim_model[doc] for doc in docs]

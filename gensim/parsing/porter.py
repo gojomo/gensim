@@ -7,9 +7,8 @@ as canonical, in that it follows the algorithm presented in [1]_, see also [2]_
 
 Author - Vivake Gupta (v@nano.com), optimizations and cleanup of the code by Lars Buitinck.
 
-Examples
---------
-
+Examples:
+---------
 .. sourcecode:: pycon
 
     >>> from gensim.parsing.porter import PorterStemmer

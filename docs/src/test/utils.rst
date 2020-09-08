@@ -1,8 +1,8 @@
-:mod:`test.utils` -- Internal testing functions
-===============================================
+:mod:`test.utils` -- Common utils
+===========================================================
 
 .. automodule:: gensim.test.utils
-    :synopsis: Common utils used in testing Gensim internally
+    :synopsis: Common utils
     :members:
     :inherited-members:
     :undoc-members:

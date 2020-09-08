@@ -1,8 +1,9 @@
-:mod:`summarization.graph` -- Graph used in TextRank summarization
-==================================================================
+:mod:`summarization.graph` -- Graph
+===================================
 
 .. automodule:: gensim.summarization.graph
-    :synopsis: Graph utilities used in the TextRank summarization algorithm
+    :synopsis: Graph
     :members:
     :inherited-members:
     :undoc-members:
+    :show-inheritance:

@@ -1,8 +1,9 @@
-:mod:`summarization.commons` -- Graph functions used in TextRank summarization
-==============================================================================
+:mod:`summarization.commons` -- Common graph functions
+=========================================================
 
 .. automodule:: gensim.summarization.commons
-    :synopsis: Common graph functions used in TextRank summarization
+    :synopsis: Common graph functions
     :members:
     :inherited-members:
     :undoc-members:
+    :show-inheritance:

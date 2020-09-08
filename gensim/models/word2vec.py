@@ -5,10 +5,7 @@
 # Copyright (C) 2018 RaRe Technologies s.r.o.
 # Licensed under the GNU LGPL v2.1 - http://www.gnu.org/licenses/lgpl.html
 
-"""
-Introduction
-============
-This module implements the word2vec family of algorithms, using highly optimized C routines,
+"""This module implements the word2vec family of algorithms, using highly optimized C routines,
 data streaming and Pythonic interfaces.
 
 The word2vec algorithms include skip-gram and CBOW models, using either
@@ -133,15 +130,21 @@ from types import GeneratorType
 import threading
 import itertools as it
 import copy
-from queue import Queue, Empty
+
+from gensim.utils import keep_vocab_item, call_on_class_only, deprecated
+from gensim.models.keyedvectors import KeyedVectors, pseudorandom_weak_vector
+
+try:
+    from queue import Queue, Empty
+except ImportError:
+    from Queue import Queue, Empty
 
 from numpy import float32 as REAL
 import numpy as np
 
-from gensim.utils import keep_vocab_item, call_on_class_only, deprecated
-from gensim.models.keyedvectors import KeyedVectors, pseudorandom_weak_vector
-from gensim import utils, matutils
-
+from gensim import utils, matutils  # utility fnc for pickling, common scipy operations etc
+from six import iteritems, itervalues, string_types
+from six.moves import range
 
 logger = logging.getLogger(__name__)
 
@@ -365,7 +368,7 @@ class Word2Vec(utils.SaveLoad):
     def build_vocab_and_train(self, corpus_iterable=None, corpus_file=None, trim_rule=None, callbacks=None):
         if not (corpus_iterable is None) ^ (corpus_file is None):
             raise ValueError("You must provide only one of corpus_iterable or corpus_file arguments.")
-        if corpus_file is not None and not isinstance(corpus_file, str):
+        if corpus_file is not None and not isinstance(corpus_file, string_types):
             raise TypeError("You must pass string as the corpus_file argument.")
         elif isinstance(corpus_iterable, GeneratorType):
             raise TypeError("You can't pass a generator as the sentences argument. Try a sequence.")
@@ -458,7 +461,7 @@ class Word2Vec(utils.SaveLoad):
         raw_vocab = word_freq
         logger.info(
             "collected %i different raw word, with total frequency of %i",
-            len(raw_vocab), sum(raw_vocab.values()),
+            len(raw_vocab), sum(itervalues(raw_vocab))
         )
 
         # Since no sentences are provided, this is to control the corpus_count.
@@ -478,11 +481,11 @@ class Word2Vec(utils.SaveLoad):
         checked_string_types = 0
         for sentence_no, sentence in enumerate(sentences):
             if not checked_string_types:
-                if isinstance(sentence, str):
+                if isinstance(sentence, string_types):
                     logger.warning(
                         "Each 'sentences' item should be a list of words (usually unicode strings). "
                         "First item here is instead plain %s.",
-                        type(sentence),
+                        type(sentence)
                     )
                 checked_string_types += 1
             if sentence_no % progress_per == 0:
@@ -564,7 +567,7 @@ class Word2Vec(utils.SaveLoad):
                 self.sample = sample
                 self.wv.key_to_index = {}
 
-            for word, v in self.raw_vocab.items():
+            for word, v in iteritems(self.raw_vocab):
                 if keep_vocab_item(word, v, self.effective_min_count, trim_rule=trim_rule):
                     retain_words.append(word)
                     retain_total += v
@@ -594,7 +597,7 @@ class Word2Vec(utils.SaveLoad):
             logger.info("Updating model with new vocabulary")
             new_total = pre_exist_total = 0
             new_words = pre_exist_words = []
-            for word, v in self.raw_vocab.items():
+            for word, v in iteritems(self.raw_vocab):
                 if keep_vocab_item(word, v, self.effective_min_count, trim_rule=trim_rule):
                     if self.wv.has_index_for(word):
                         pre_exist_words.append(word)
@@ -800,31 +803,6 @@ class Word2Vec(utils.SaveLoad):
 
         # do not suppress learning for already learned words
         self.wv.vectors_lockf = np.ones(1, dtype=REAL)  # 0.0 values suppress word-backprop-updates; 1.0 allows
-
-    @deprecated(
-        "Gensim 4.0.0 implemented internal optimizations that make calls to init_sims() unnecessary. "
-        "init_sims() is now obsoleted and will be completely removed in future versions. "
-        "See https://github.com/RaRe-Technologies/gensim/wiki/Migrating-from-Gensim-3.x-to-4#init_sims"
-    )
-    def init_sims(self, replace=False):
-        """
-        Precompute L2-normalized vectors. Obsoleted.
-
-        If you need a single unit-normalized vector for some key, call
-        :meth:`~gensim.models.keyedvectors.KeyedVectors.get_vector` instead:
-        ``word2vec_model.wv.get_vector(key, norm=True)``.
-
-        To refresh norms after you performed some atypical out-of-band vector tampering,
-        call `:meth:`~gensim.models.keyedvectors.KeyedVectors.fill_norms()` instead.
-
-        Parameters
-        ----------
-        replace : bool
-            If True, forget the original trained vectors and only keep the normalized ones.
-            You lose information if you do this.
-
-        """
-        self.wv.init_sims(replace=replace)
 
     def _do_train_epoch(self, corpus_file, thread_id, offset, cython_vocab, thread_private_mem, cur_epoch,
                         total_examples=None, total_words=None, **kwargs):
@@ -1813,7 +1791,7 @@ class Word2Vec(utils.SaveLoad):
         super(Word2Vec, self).save(*args, **kwargs)
 
     def _save_specials(self, fname, separately, sep_limit, ignore, pickle_protocol, compress, subname):
-        """Arrange any special handling for the `gensim.utils.SaveLoad` protocol."""
+        """Arrange any special handling for the gensim.utils.SaveLoad protocol"""
         # don't save properties that are merely calculated from others
         ignore = set(it.chain(ignore, ('cum_table',)))
         return super(Word2Vec, self)._save_specials(

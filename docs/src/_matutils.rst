@@ -1,8 +1,8 @@
-:mod:`_matutils` -- Compiled extension for math utils
-=====================================================
+:mod:`_matutils` -- Cython matutils
+===================================
 
 .. automodule:: gensim._matutils
-    :synopsis: Compiled extension for math utils
+    :synopsis: Cython math utils
     :members:
     :inherited-members:
     :undoc-members:
