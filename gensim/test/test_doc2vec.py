@@ -643,10 +643,14 @@ class TestDoc2VecModel(unittest.TestCase):
     def test_mixed_tag_types(self):
         """Ensure alternating int/string tags don't share indexes in vectors"""
         mixed_tag_corpus = [doc2vec.TaggedDocument(words, [i, words[0]]) for i, words in enumerate(raw_sentences)]
+        unique_1st_words = len(set(words[0] for words in raw_sentences))
         model = doc2vec.Doc2Vec()
         model.build_vocab(mixed_tag_corpus)
-        expected_length = len(sentences) + len(model.dv.key_to_index)  # 9 sentences, 7 unique first tokens
+        expected_length = len(mixed_tag_corpus) + unique_1st_words
         self.assertEqual(len(model.dv.vectors), expected_length)
+        for tag in (words[0] for words in raw_sentences):
+            # ensure all string slots past highest int slot
+            self.assertGreaterEqual(model.dv.key_to_index[tag], len(mixed_tag_corpus), f"{tag} index in int range")
         # TODO: test saving in word2vec format
 
     def models_equal(self, model, model2):
@@ -674,7 +678,8 @@ class TestDoc2VecModel(unittest.TestCase):
         sentences = [doc2vec.TaggedDocument(words, [i]) for i, words in enumerate(raw_sentences)]
         model = doc2vec.Doc2Vec()
         model.build_vocab(sentences)
-        warning = "Each 'words' should be a list of words (usually unicode strings)."
+        warning = "should be a list of words (usually unicode strings)."
+        print(f"LOGLINES {loglines}")
         self.assertTrue(warning in str(loglines))
 
     @log_capture()

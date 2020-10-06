@@ -185,7 +185,7 @@ import sys
 import os
 import heapq
 from timeit import default_timer
-from collections import defaultdict, namedtuple
+from collections import namedtuple, Counter
 from collections.abc import Iterable
 from types import GeneratorType
 import threading
@@ -196,8 +196,9 @@ from queue import Queue, Empty
 from numpy import float32 as REAL
 import numpy as np
 
-from gensim.utils import keep_vocab_item, call_on_class_only, deprecated
+from gensim.utils import call_on_class_only, deprecated
 from gensim.models.keyedvectors import KeyedVectors, pseudorandom_weak_vector
+from gensim.models.tokensurvey import TokenSurvey
 from gensim import utils, matutils
 
 
@@ -238,7 +239,7 @@ class Word2Vec(utils.SaveLoad):
     def __init__(
             self, sentences=None, corpus_file=None, vector_size=100, alpha=0.025, window=5, min_count=5,
             max_vocab_size=None, sample=1e-3, seed=1, workers=3, min_alpha=0.0001,
-            sg=0, hs=0, negative=5, ns_exponent=0.75, cbow_mean=1, hashfxn=hash, epochs=5, null_word=0,
+            sg=0, hs=0, negative=5, ns_exponent=0.75, cbow_mean=1, hashfxn=hash, epochs=5,
             trim_rule=None, sorted_vocab=1, batch_words=MAX_WORDS_IN_BATCH, compute_loss=False, callbacks=(),
             comment=None, max_final_vocab=None,
         ):
@@ -394,7 +395,6 @@ class Word2Vec(utils.SaveLoad):
         self.min_count = min_count
         self.sample = sample
         self.sorted_vocab = sorted_vocab
-        self.null_word = null_word
         self.cum_table = None  # for negative sampling
         self.raw_vocab = None
 
@@ -423,8 +423,8 @@ class Word2Vec(utils.SaveLoad):
         else:
             if trim_rule is not None:
                 logger.warning(
-                    "The rule, if given, is only used to prune vocabulary during build_vocab() "
-                    "and is not stored as part of the model. Model initialized without sentences. "
+                    "The trim_rule, if given, is only used to prune vocabulary during build_vocab() "
+                    "and is not stored as part of the model. Model initialized without corpus. "
                     "trim_rule provided, if any, will be ignored.")
             if callbacks:
                 logger.warning(
@@ -435,9 +435,10 @@ class Word2Vec(utils.SaveLoad):
 
     def build_vocab(
             self, corpus_iterable=None, corpus_file=None, update=False, progress_per=10000,
-            keep_raw_vocab=False, trim_rule=None, **kwargs,
+            keep_survey=True, trim_rule=None,
     ):
-        """Build vocabulary from a sequence of sentences (can be a once-only generator stream).
+        """Build vocabulary from a sequence of sentences (can be a once-only generator stream), and
+        initialize model to be ready for training.
 
         Parameters
         ----------
@@ -454,8 +455,9 @@ class Word2Vec(utils.SaveLoad):
             If true, the new words in `sentences` will be added to model's vocab.
         progress_per : int, optional
             Indicates how many words to process before showing/updating the progress.
-        keep_raw_vocab : bool, optional
-            If False, the raw vocabulary will be deleted after the scaling is done to free up RAM.
+        keep_survey : bool, optional
+            If False, the raw word survey will be deleted after model initialization is done to free up RAM.
+            Default is to True to keep the survey around for reference or later updates.
         trim_rule : function, optional
             Vocabulary trimming rule, specifies whether certain words should remain in the vocabulary,
             be trimmed away, or handled using the default (discard if word count < min_count).
@@ -470,21 +472,21 @@ class Word2Vec(utils.SaveLoad):
                 * `count` (int) - the word's frequency count in the corpus
                 * `min_count` (int) - the minimum count threshold.
 
-        **kwargs : object
-            Key word arguments propagated to `self.prepare_vocab`
-
         """
         self._check_corpus_sanity(corpus_iterable=corpus_iterable, corpus_file=corpus_file, passes=1)
-        total_words, corpus_count = self.scan_vocab(
-            corpus_iterable=corpus_iterable, corpus_file=corpus_file, progress_per=progress_per, trim_rule=trim_rule)
-        self.corpus_count = corpus_count
-        self.corpus_total_words = total_words
-        report_values = self.prepare_vocab(update=update, keep_raw_vocab=keep_raw_vocab, trim_rule=trim_rule, **kwargs)
-        report_values['memory'] = self.estimate_memory(vocab_size=report_values['num_retained_words'])
-        self.prepare_weights(update=update)
+
+        words_survey = self.scan_vocab(
+            corpus_iterable=corpus_iterable, corpus_file=corpus_file, progress_per=progress_per, trim_rule=trim_rule,
+        )
+
+        # initialize or update model to match discovered vocabulary in survey & model settings
+        if not update:
+            self.allocate_model(words_survey, keep_survey=keep_survey)
+        else:
+            self.update_model(words_survey, keep_survey=keep_survey)
 
     def build_vocab_from_freq(
-            self, word_freq, keep_raw_vocab=False, corpus_count=None, trim_rule=None, update=False,
+            self, word_freq, keep_survey=True, corpus_count=0, trim_rule=None, update=False,
         ):
         """Build vocabulary from a dictionary of word frequencies.
 
@@ -492,8 +494,8 @@ class Word2Vec(utils.SaveLoad):
         ----------
         word_freq : dict of (str, int)
             A mapping from a word in the vocabulary to its frequency count.
-        keep_raw_vocab : bool, optional
-            If False, delete the raw vocabulary after the scaling is done to free up RAM.
+        keep_survey : bool, optional
+            If False, discard raw vocabulary counts after initialization is done to free up RAM.
         corpus_count : int, optional
             Even if no corpus is provided, this argument can set corpus_count explicitly.
         trim_rule : function, optional
@@ -515,181 +517,68 @@ class Word2Vec(utils.SaveLoad):
 
         """
         logger.info("Processing provided word frequencies")
-        # Instead of scanning text, this will assign provided word frequencies dictionary(word_freq)
-        # to be directly the raw vocab
-        raw_vocab = word_freq
+        # instead of scanning a corpus, turn provided word_freq dict into synthetic TokenSurvey
+        words_survey = TokenSurvey(raw_tally=Counter(word_freq), corpus_count=corpus_count, items='words')
+
         logger.info(
-            "collected %i different raw word, with total frequency of %i",
-            len(raw_vocab), sum(raw_vocab.values()),
+            f"collected {len(words_survey.raw_tally)} different raw words, "
+            f"with total frequency of {words_survey.total_tokens}",
         )
 
-        # Since no sentences are provided, this is to control the corpus_count.
-        self.corpus_count = corpus_count or 0
-        self.raw_vocab = raw_vocab
+        # initialize or update model to match discovered vocabulary in survey & model settings
+        if not update:
+            self.allocate_model(words_survey, keep_survey=keep_survey)
+        else:
+            self.update_model(words_survey, keep_survey=keep_survey)
+            # FIXME: ensure all post-vocab-freeze init (incl sample/cum_table) here
 
-        # trim by min_count & precalculate downsampling
-        report_values = self.prepare_vocab(keep_raw_vocab=keep_raw_vocab, trim_rule=trim_rule, update=update)
-        report_values['memory'] = self.estimate_memory(vocab_size=report_values['num_retained_words'])
-        self.prepare_weights(update=update)  # build tables & arrays
+    def scan_vocab(
+            self, corpus_iterable=None, corpus_file=None, words_survey=None,
+            progress_per=10000, trim_rule=None,
+    ):
+        """
+        Scan the provided corpus, returning a TokenSurvey of frequency & other statistics of its words.
 
-    def _scan_vocab(self, sentences, progress_per, trim_rule):
-        sentence_no = -1
-        total_words = 0
-        min_reduce = 1
-        vocab = defaultdict(int)
-        checked_string_types = 0
-        for sentence_no, sentence in enumerate(sentences):
-            if not checked_string_types:
-                if isinstance(sentence, str):
-                    logger.warning(
-                        "Each 'sentences' item should be a list of words (usually unicode strings). "
-                        "First item here is instead plain %s.",
-                        type(sentence),
-                    )
-                checked_string_types += 1
-            if sentence_no % progress_per == 0:
-                logger.info(
-                    "PROGRESS: at sentence #%i, processed %i words, keeping %i word types",
-                    sentence_no, total_words, len(vocab)
-                )
-            for word in sentence:
-                vocab[word] += 1
-            total_words += len(sentence)
+        Parameters
+        ----------
+        corpus_iterable : iterable of list of str
+            As described in :meth:`~gensim.models.word2vec.Word2Vec.build_vocab`
+        corpus_file : str, optional
+            As described in :meth:`~gensim.models.word2vec.Word2Vec.build_vocab`
+        progress_per : int
+            As described in :meth:`~gensim.models.word2vec.Word2Vec.build_vocab`
+        trim_rule : function, optional
+            As described in :meth:`~gensim.models.word2vec.Word2Vec.build_vocab`
 
-            if self.max_vocab_size and len(vocab) > self.max_vocab_size:
-                utils.prune_vocab(vocab, min_reduce, trim_rule=trim_rule)
-                min_reduce += 1
+        Returns
+        -------
+        TokenSurvey
+            Survey of word frequencies & other statistics useful for initialization/updates.
 
-        corpus_count = sentence_no + 1
-        self.raw_vocab = vocab
-        return total_words, corpus_count
-
-    def scan_vocab(self, corpus_iterable=None, corpus_file=None, progress_per=10000, workers=None, trim_rule=None):
+        """
         logger.info("collecting all words and their counts")
+
         if corpus_file:
             corpus_iterable = LineSentence(corpus_file)
 
-        total_words, corpus_count = self._scan_vocab(corpus_iterable, progress_per, trim_rule)
+        words_survey = words_survey or TokenSurvey(prune_at_size=self.max_vocab_size, items='words')
+        words_survey.update_with(corpus_iterable, progress_per=progress_per, trim_rule=trim_rule)
 
         logger.info(
-            "collected %i word types from a corpus of %i raw words and %i sentences",
-            len(self.raw_vocab), total_words, corpus_count
+            f"collected {len(words_survey)} word types "
+            f"from a corpus of {words_survey.total_tokens} raw words "
+            f"and {words_survey.corpus_count} texts"
         )
+        return words_survey
 
-        return total_words, corpus_count
+    def refresh_downsampling(self):
+        """Ensure per-word sampling thresholds properly set/reset, based on counts in active word-vectors."""
 
-    def prepare_vocab(
-            self, update=False, keep_raw_vocab=False, trim_rule=None,
-            min_count=None, sample=None, dry_run=False,
-        ):
-        """Apply vocabulary settings for `min_count` (discarding less-frequent words)
-        and `sample` (controlling the downsampling of more-frequent words).
+        if len(self.wv) == 0:
+            return  # nothing to do
 
-        Calling with `dry_run=True` will only simulate the provided settings and
-        report the size of the retained vocabulary, effective corpus length, and
-        estimated memory requirements. Results are both printed via logging and
-        returned as a dict.
-
-        Delete the raw vocabulary after the scaling is done to free up RAM,
-        unless `keep_raw_vocab` is set.
-
-        """
-        min_count = min_count or self.min_count
-        sample = sample or self.sample
-        drop_total = drop_unique = 0
-
-        # set effective_min_count to min_count in case max_final_vocab isn't set
-        self.effective_min_count = min_count
-
-        # if max_final_vocab is specified instead of min_count
-        # pick a min_count which satisfies max_final_vocab as well as possible
-        if self.max_final_vocab is not None:
-            sorted_vocab = sorted(self.raw_vocab.keys(), key=lambda word: self.raw_vocab[word], reverse=True)
-            calc_min_count = 1
-
-            if self.max_final_vocab < len(sorted_vocab):
-                calc_min_count = self.raw_vocab[sorted_vocab[self.max_final_vocab]] + 1
-
-            self.effective_min_count = max(calc_min_count, min_count)
-            logger.info(
-                "max_final_vocab=%d and min_count=%d resulted in calc_min_count=%d, effective_min_count=%d",
-                self.max_final_vocab, min_count, calc_min_count, self.effective_min_count
-            )
-
-        if not update:
-            logger.info("Loading a fresh vocabulary")
-            retain_total, retain_words = 0, []
-            # Discard words less-frequent than min_count
-            if not dry_run:
-                self.wv.index_to_key = []
-                # make stored settings match these applied settings
-                self.min_count = min_count
-                self.sample = sample
-                self.wv.key_to_index = {}
-
-            for word, v in self.raw_vocab.items():
-                if keep_vocab_item(word, v, self.effective_min_count, trim_rule=trim_rule):
-                    retain_words.append(word)
-                    retain_total += v
-                    if not dry_run:
-                        self.wv.key_to_index[word] = len(self.wv.index_to_key)
-                        self.wv.index_to_key.append(word)
-                else:
-                    drop_unique += 1
-                    drop_total += v
-            if not dry_run:
-                # now update counts
-                for word in self.wv.index_to_key:
-                    self.wv.set_vecattr(word, 'count', self.raw_vocab[word])
-            original_unique_total = len(retain_words) + drop_unique
-            retain_unique_pct = len(retain_words) * 100 / max(original_unique_total, 1)
-            logger.info(
-                "effective_min_count=%d retains %i unique words (%i%% of original %i, drops %i)",
-                self.effective_min_count, len(retain_words), retain_unique_pct, original_unique_total, drop_unique
-            )
-            original_total = retain_total + drop_total
-            retain_pct = retain_total * 100 / max(original_total, 1)
-            logger.info(
-                "effective_min_count=%d leaves %i word corpus (%i%% of original %i, drops %i)",
-                self.effective_min_count, retain_total, retain_pct, original_total, drop_total
-            )
-        else:
-            logger.info("Updating model with new vocabulary")
-            new_total = pre_exist_total = 0
-            new_words = []
-            pre_exist_words = []
-            for word, v in self.raw_vocab.items():
-                if keep_vocab_item(word, v, self.effective_min_count, trim_rule=trim_rule):
-                    if self.wv.has_index_for(word):
-                        pre_exist_words.append(word)
-                        pre_exist_total += v
-                        if not dry_run:
-                            pass
-                    else:
-                        new_words.append(word)
-                        new_total += v
-                        if not dry_run:
-                            self.wv.key_to_index[word] = len(self.wv.index_to_key)
-                            self.wv.index_to_key.append(word)
-                else:
-                    drop_unique += 1
-                    drop_total += v
-            if not dry_run:
-                # now update counts
-                self.wv.allocate_vecattrs(attrs=['count'], types=[type(0)])
-                for word in self.wv.index_to_key:
-                    self.wv.set_vecattr(word, 'count', self.wv.get_vecattr(word, 'count') + self.raw_vocab.get(word, 0))
-            original_unique_total = len(pre_exist_words) + len(new_words) + drop_unique
-            pre_exist_unique_pct = len(pre_exist_words) * 100 / max(original_unique_total, 1)
-            new_unique_pct = len(new_words) * 100 / max(original_unique_total, 1)
-            logger.info(
-                "New added %i unique words (%i%% of original %i) "
-                "and increased the count of %i pre-existing words (%i%% of original %i)",
-                len(new_words), new_unique_pct, original_unique_total, len(pre_exist_words),
-                pre_exist_unique_pct, original_unique_total
-            )
-            retain_words = new_words + pre_exist_words
-            retain_total = new_total + pre_exist_total
+        retain_total = sum(self.wv.get_allattr('count'))
+        sample = self.sample
 
         # Precalculate each vocabulary item's threshold for sampling
         if not sample:
@@ -703,8 +592,8 @@ class Word2Vec(utils.SaveLoad):
             threshold_count = int(sample * (3 + np.sqrt(5)) / 2)
 
         downsample_total, downsample_unique = 0, 0
-        for w in retain_words:
-            v = self.raw_vocab[w]
+        for w in self.wv.index_to_key:
+            v = self.wv.get_vecattr(w, 'count')
             word_probability = (np.sqrt(v / threshold_count) + 1) * (threshold_count / v)
             if word_probability < 1.0:
                 downsample_unique += 1
@@ -712,41 +601,13 @@ class Word2Vec(utils.SaveLoad):
             else:
                 word_probability = 1.0
                 downsample_total += v
-            if not dry_run:
-                self.wv.set_vecattr(w, 'sample_int', np.uint32(word_probability * (2**32 - 1)))
+            self.wv.set_vecattr(w, 'sample_int', np.uint32(word_probability * (2**32 - 1)))
 
-        if not dry_run and not keep_raw_vocab:
-            logger.info("deleting the raw counts dictionary of %i items", len(self.raw_vocab))
-            self.raw_vocab = defaultdict(int)
-
-        logger.info("sample=%g downsamples %i most-common words", sample, downsample_unique)
+        logger.info(f"sample={sample} downsamples {downsample_unique} most-common words")
         logger.info(
-            "downsampling leaves estimated %i word corpus (%.1f%% of prior %i)",
-            downsample_total, downsample_total * 100.0 / max(retain_total, 1), retain_total
+            f"downsampling leaves estimated {downsample_total} word corpus "
+            f"({downsample_total * 100.0 / max(retain_total, 1)}% of prior {retain_total})"
         )
-
-        # return from each step: words-affected, resulting-corpus-size, extra memory estimates
-        report_values = {
-            'drop_unique': drop_unique, 'retain_total': retain_total, 'downsample_unique': downsample_unique,
-            'downsample_total': int(downsample_total), 'num_retained_words': len(retain_words)
-        }
-
-        if self.null_word:
-            # create null pseudo-word for padding when using concatenative L1 (run-of-words)
-            # this word is only ever input – never predicted – so count, huffman-point, etc doesn't matter
-            self.add_null_word()
-
-        if self.sorted_vocab and not update:
-            self.wv.sort_by_descending_frequency()
-
-        if self.hs:
-            # add info about each word's Huffman encoding
-            self.create_binary_tree()
-        if self.negative:
-            # build the table for drawing random words (for negative sampling)
-            self.make_cum_table()
-
-        return report_values
 
     def estimate_memory(self, vocab_size=None, report=None):
         """Estimate required memory for a model using current settings and provided vocabulary size.
@@ -778,12 +639,6 @@ class Word2Vec(utils.SaveLoad):
             vocab_size, self.vector_size, report['total']
         )
         return report
-
-    def add_null_word(self):
-        word = '\0'
-        self.wv.key_to_index[word] = len(self.wv)
-        self.wv.index_to_key.append(word)
-        self.wv.set_vecattr(word, 'count', 1)
 
     def create_binary_tree(self):
         """Create a `binary Huffman tree <https://en.wikipedia.org/wiki/Huffman_coding>`_ using stored vocabulary
@@ -817,44 +672,133 @@ class Word2Vec(utils.SaveLoad):
         if len(self.cum_table) > 0:
             assert self.cum_table[-1] == domain
 
-    def prepare_weights(self, update=False):
-        """Build tables and model weights based on final vocabulary settings."""
-        # set initial input/projection and hidden weights
-        if not update:
-            self.init_weights()
-        else:
-            self.update_weights()
-
     @deprecated("Use gensim.models.keyedvectors.pseudorandom_weak_vector() directly")
     def seeded_vector(self, seed_string, vector_size):
         return pseudorandom_weak_vector(vector_size, seed_string=seed_string, hashfxn=self.hashfxn)
 
-    def init_weights(self):
-        """Reset all projection weights to an initial (untrained) state, but keep the existing vocabulary."""
+    def allocate_model(self, words_survey, keep_survey=True):
+        """
+        Build all internal model structures & subsidiary vector sets to ready model for training.
+
+        Parameters
+        ----------
+        word_survey : TokenSurvey
+            Survey of words in the expected training corpus
+        keep_survey : bool, optional
+            If True (default), the survey is cached in the model, which can be useful
+            for future debugging or model updates. If false, the method consults them
+            but does not store them in the model.
+        """
+
+        if keep_survey:
+            self.words_survey = words_survey
+        self.corpus_count = words_survey.corpus_count
+        self.corpus_total_words = words_survey.total_tokens
+
+        # if max_final_vocab specified, ensure effective_min_count creates no-larger surviving sorted_vocab
+        if self.max_final_vocab is None:
+            self.effective_min_count = self.min_count
+            sorted_vocab = [
+                (word, count)
+                for word, count in words_survey.raw_tally.most_common()
+                if count >= self.effective_min_count
+            ]
+        else:
+            sorted_vocab = words_survey.raw_tally.most_common(self.max_final_vocab + 1)
+            calc_min_count = 1
+            if self.max_final_vocab < len(sorted_vocab):
+                calc_min_count = sorted_vocab[-1][1] + 1  # just enough to discard all past max_final_vocab
+            self.effective_min_count = max(calc_min_count, self.min_count)
+            logger.info(
+                "max_final_vocab=%d and min_count=%d resulted in calc_min_count=%d, effective_min_count=%d",
+                self.max_final_vocab, self.min_count, calc_min_count, self.effective_min_count
+            )
+            sorted_vocab = sorted_vocab[0:self.max_final_vocab]
+
         logger.info("resetting layer weights")
-        self.wv.resize_vectors(seed=self.seed)
+        logger.info("Loading a fresh vocabulary")
+        self.wv.reset_for(sorted_vocab, seed=self.seed)
+
+        self.refresh_downsampling()
 
         if self.hs:
+            # add info about each word's Huffman encoding
+            self.create_binary_tree()
+            # allocate internal weights
             self.syn1 = np.zeros((len(self.wv), self.layer1_size), dtype=REAL)
+
         if self.negative:
+            # build the table for drawing random words (for negative sampling)
+            self.make_cum_table()
+            # allocate internal weights
             self.syn1neg = np.zeros((len(self.wv), self.layer1_size), dtype=REAL)
 
-    def update_weights(self):
+    def update_model(self, words_survey, keep_survey=True):
         """Copy all the existing weights, and reset the weights for the newly added vocabulary."""
-        logger.info("updating layer weights")
+
         # Raise an error if an online update is run before initial training on a corpus
         if not len(self.wv.vectors):
             raise RuntimeError(
                 "You cannot do an online vocabulary-update of a model which has no prior vocabulary. "
                 "First build the vocabulary of your model with a corpus before doing an online update."
             )
-        preresize_count = len(self.wv.vectors)
+
+        logger.info("Updating model with new vocabulary")
+        if hasattr(self, 'words_survey'):
+            # merge new survey with prexisting
+            self.words_survey.combine_survey(words_survey)
+            words_survey = self.words_survey
+            # if not keep_survey: # TODO WARN RESULTS STILL KEPT?
+        else:
+            pass  # TODO WARN of problems with missing stats, or adapt to use wv counts?
+        if keep_survey:
+            self.words_survey = words_survey
+        self.corpus_count = words_survey.corpus_count
+        self.corpus_total_words = words_survey.total_tokens
+
+        # add new words
+        words_to_add = []
+        words_repeated = []
+        if not hasattr(self, 'effective_min_count'):
+            self.effective_min_count = self.min_count
+        for word, count in words_survey.raw_tally.most_common():
+            if count < self.effective_min_count:
+                break  # this word & all following can't qualify for addition
+            if word not in self.wv:  # TODO: in ft use haskeyfor?
+                words_to_add.append(word)
+            else:
+                words_repeated.append(word)
+
+        prior_wordvector_count = len(self.wv)
+        logger.info("updating layer weights")
+        self.wv.expand_for(words_to_add)
+        # ensure words in wv have updated counts: both old & new
+        increased_counts = 0
+        for word in self.wv.index_to_key:
+            if words_survey.raw_tally[word] > self.wv.get_vecattr(word, 'count'):
+                self.wv.set_vecattr(word, 'count', words_survey.raw_tally[word])
+                increased_counts += 1
+        increased_counts -= len(words_to_add)  # don't consider new counts for added words in this stat
+        logger.info(
+            f"New added {len(words_to_add)} unique words "
+            f"({len(words_to_add) * 100.0 / len(words_survey)}% of all unique {len(words_survey)} "
+            f"and increased the counts of {increased_counts} pre-existing words "
+            f"({increased_counts * 100.0 / prior_wordvector_count}% of original {prior_wordvector_count}",
+        )
+
         self.wv.resize_vectors(seed=self.seed)
-        gained_vocab = len(self.wv.vectors) - preresize_count
+        gained_vocab = len(self.wv.vectors) - prior_wordvector_count
+        assert gained_vocab == len(words_to_add)  # TODO DELME
+
+        self.refresh_downsampling()
 
         if self.hs:
+            # FIXME: Keeping old syn1 weights with recalculated binary-tree codings is probably nonsense,
+            # but our `update=True` paths have been doing this nonsense for a while.
+            self.create_binary_tree()
             self.syn1 = np.vstack([self.syn1, np.zeros((gained_vocab, self.layer1_size), dtype=REAL)])
         if self.negative:
+            self.make_cum_table()
             pad = np.zeros((gained_vocab, self.layer1_size), dtype=REAL)
             self.syn1neg = np.vstack([self.syn1neg, pad])
 
@@ -939,10 +883,12 @@ class Word2Vec(utils.SaveLoad):
         Notes
         -----
         To support linear learning-rate decay from (initial) `alpha` to `min_alpha`, and accurate
-        progress-percentage logging, either `total_examples` (count of sentences) or `total_words` (count of
-        raw words in sentences) **MUST** be provided. If `sentences` is the same corpus
-        that was provided to :meth:`~gensim.models.word2vec.Word2Vec.build_vocab` earlier,
-        you can simply use `total_examples=self.corpus_count`.
+        progress-percentage logging, either `total_examples` (count of corpus text examples) or
+        `total_words` (count of raw words in text examples) **MUST** be provided. If the training corpus
+        is the same full corpus that was just provided to :meth:`~gensim.models.word2vec.Word2Vec.build_vocab`,
+        you can simply use `total_examples=self.corpus_count`. But in other cases, such as any incremental
+        training on a greater or smaller nubmer of examples, an accurate count matching the number of texts
+        in the current `corpus_iterable` or `corpus_file` must be provided.
 
         Warnings
         --------
@@ -964,9 +910,9 @@ class Word2Vec(utils.SaveLoad):
             You may use this argument instead of `sentences` to get performance boost. Only one of `sentences` or
             `corpus_file` arguments need to be passed (not both of them).
         total_examples : int
-            Count of sentences.
+            Count of text examples in corpus.
         total_words : int
-            Count of raw words in sentences.
+            Count of raw words in corpus.
         epochs : int
             Number of iterations (epochs) over the corpus.
         start_alpha : float, optional
@@ -1462,7 +1408,7 @@ class Word2Vec(utils.SaveLoad):
         """
         return sum(len(sentence) for sentence in job)
 
-    def _check_corpus_sanity(self, corpus_iterable=None, corpus_file=None, passes=1):
+    def _check_corpus_sanity(self, corpus_iterable=None, corpus_file=None, passes=1, items="lists of strings"):
         """Checks whether the corpus parameters make sense."""
         if corpus_file is None and corpus_iterable is None:
             raise TypeError("Either one of corpus_file or corpus_iterable value must be provided")
@@ -1472,7 +1418,7 @@ class Word2Vec(utils.SaveLoad):
             raise TypeError("Parameter corpus_file must be a valid path to a file, got %r instead" % corpus_file)
         if corpus_iterable is not None and not isinstance(corpus_iterable, Iterable):
             raise TypeError(
-                "The corpus_iterable must be an iterable of lists of strings, got %r instead" % corpus_iterable)
+                f"The corpus_iterable must be an iterable of {items}, got %r instead" % corpus_iterable)
         if corpus_iterable is not None and isinstance(corpus_iterable, GeneratorType) and passes > 1:
             raise TypeError(
                 f"Using a generator as corpus_iterable can't support {passes} passes. Try a re-iterable sequence.")
@@ -1820,16 +1766,14 @@ class Word2Vec(utils.SaveLoad):
     def reset_from(self, other_model):
         """Borrow shareable pre-built structures from `other_model` and reset hidden layer weights.
 
-        Structures copied are:
-            * Vocabulary
-            * Index to word mapping
-            * Cumulative frequency table (used for negative sampling)
-            * Cached corpus length
+        Structures copied are the vocabulary structures & stats that are *usually* frozen and only
+        read-only after a single build_vocab() step. You can think of this as a shortcut replacing
+        build_vocab() on a similarly-shaped model with a sort of "borrow_vocab" step instead.
 
-        Useful when testing multiple models on the same corpus in parallel. However, as the models
-        then share all vocabulary-related structures other than vectors, neither should then
-        expand their vocabulary (which could leave the other in an inconsistent, broken state).
-        And, any changes to any per-word 'vecattr' will affect both models.
+        This may be a helpful time- and RAM- saving hack when testing multiple models on exact the
+        same corpus in parallel. However, as the models then share all vocabulary-related structures
+        other than vectors, neither should then expand or modify the stats/vecattr of their vocabulary
+        in any way, which could leave the other in an inconsistent, broken state. Use at your own risk.
 
 
         Parameters
@@ -1842,9 +1786,17 @@ class Word2Vec(utils.SaveLoad):
         self.wv.index_to_key = other_model.wv.index_to_key
         self.wv.key_to_index = other_model.wv.key_to_index
         self.wv.expandos = other_model.wv.expandos
+        self.wv.resize_vectors()
         self.cum_table = other_model.cum_table
         self.corpus_count = other_model.corpus_count
-        self.init_weights()
+        if self.hs:
+            # add info about each word's Huffman encoding
+            self.create_binary_tree()
+            # allocate internal weights
+            self.syn1 = np.zeros((len(self.wv), self.layer1_size), dtype=REAL)
+        if self.negative:
+            # allocate internal weights
+            self.syn1neg = np.zeros((len(self.wv), self.layer1_size), dtype=REAL)
 
     def __str__(self):
         """Human readable representation of the model's state.
@@ -1941,7 +1893,7 @@ class Word2Vec(utils.SaveLoad):
         if not hasattr(self, 'max_final_vocab'):
             self.max_final_vocab = None
         if hasattr(self, 'vocabulary'):  # re-integrate state that had been moved
-            for a in ('max_vocab_size', 'min_count', 'sample', 'sorted_vocab', 'null_word', 'raw_vocab'):
+            for a in ('max_vocab_size', 'min_count', 'sample', 'sorted_vocab', 'raw_vocab'):
                 setattr(self, a, getattr(self.vocabulary, a))
             del self.vocabulary
         if hasattr(self, 'trainables'):  # re-integrate state that had been moved

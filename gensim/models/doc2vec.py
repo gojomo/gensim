@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Author: Gensim Contributors
-# Copyright (C) 2018 RaRe Technologies s.r.o.
+# Copyright (C) 2020 RaRe Technologies s.r.o.
 # Licensed under the GNU LGPL v2.1 - http://www.gnu.org/licenses/lgpl.html
 
 """
@@ -67,18 +67,19 @@ Infer vector for a new document:
 
 import logging
 import os
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 from collections.abc import Iterable
-from timeit import default_timer
+from threading import Thread
 
 from dataclasses import dataclass
 from numpy import zeros, float32 as REAL, vstack, integer, dtype
 import numpy as np
 
 from gensim import utils, matutils  # utility fnc for pickling, common scipy operations etc
-from gensim.utils import deprecated
+from gensim.utils import deprecated, IterableQueue
 from gensim.models import Word2Vec
 from gensim.models.keyedvectors import KeyedVectors, pseudorandom_weak_vector
+from gensim.models.tokensurvey import TokenSurvey
 
 logger = logging.getLogger(__name__)
 
@@ -162,24 +163,28 @@ class Doctag:
 
 
 class Doc2Vec(Word2Vec):
-    def __init__(self, documents=None, corpus_file=None, vector_size=100, dm_mean=None, dm=1, dbow_words=0, dm_concat=0,
-                 dm_tag_count=1, dv=None, dv_mapfile=None, comment=None, trim_rule=None, callbacks=(),
-                 window=5, epochs=10, **kwargs):
+    def __init__(
+        self, corpus_iterable=None, corpus_file=None, vector_size=100, dm_mean=1, dm=1, dbow_words=0,
+        dm_concat=0, dm_tag_count=1, dv=None, dv_mapfile=None, comment=None, trim_rule=None, callbacks=(),
+        window=5, epochs=10, direct_int_tags=True, **kwargs,
+    ):
         """Class for training, using and evaluating neural networks described in
         `Distributed Representations of Sentences and Documents <http://arxiv.org/abs/1405.4053v2>`_.
 
         Parameters
         ----------
-        documents : iterable of list of :class:`~gensim.models.doc2vec.TaggedDocument`, optional
-            Input corpus, can be simply a list of elements, but for larger corpora,consider an iterable that streams
-            the documents directly from disk/network. If you don't supply `documents` (or `corpus_file`), the model is
-            left uninitialized -- use if you plan to initialize it in some other way.
+        corpus_iterable : iterable of list of :class:`~gensim.models.doc2vec.TaggedDocument`, optional
+            Input corpus, can be simply a list of elements, but for larger corpora, consider an iterable
+            that streams the documents directly from disk/network. If you don't supply `corpus_iterable`
+            (or `corpus_file`), the model is left uninitialized -- you must then call `build_vocab()` (or
+            equivalent) and `train()` yourself.
         corpus_file : str, optional
             Path to a corpus file in :class:`~gensim.models.word2vec.LineSentence` format.
-            You may use this argument instead of `documents` to get performance boost. Only one of `documents` or
-            `corpus_file` arguments need to be passed (or none of them, in that case, the model is left uninitialized).
-            Documents' tags are assigned automatically and are equal to line number, as in
-            :class:`~gensim.models.doc2vec.TaggedLineDocument`.
+            You may use this argument instead of `corpus_iterable` to get better training speed with
+            a larger number of worker threads, but then each document is limited to a single
+            automatic tag equal to its line number, as in :class:`~gensim.models.doc2vec.TaggedLineDocument`.
+            Only one of `corpus_iterable` and `corpus_file` may be provided, or neither to leave the model
+            uninitialized.
         dm : {1,0}, optional
             Defines the training algorithm. If `dm=1`, 'distributed memory' (PV-DM) is used.
             Otherwise, `distributed bag of words` (PV-DBOW) is employed.
@@ -229,7 +234,7 @@ class Doc2Vec(Word2Vec):
             Only applies when `dm` is used in non-concatenative mode.
         dm_concat : {1,0}, optional
             If 1, use concatenation of context vectors rather than sum/average;
-            Note concatenation results in a much-larger model, as the input
+            Note concatenation results in a much-larger and slower-to-train model, as the input
             is no longer the size of one (sampled or arithmetically combined) word vector, but the
             size of the tag(s) and all words in the context strung together.
         dm_tag_count : int, optional
@@ -255,6 +260,12 @@ class Doc2Vec(Word2Vec):
         callbacks : :obj: `list` of :obj: `~gensim.models.callbacks.CallbackAny2Vec`, optional
             List of callbacks that need to be executed/run at specific stages during training.
 
+        direct_int_keys : bool, optional
+            If True (default), any plain-int tags will be considered direct literal indexes for storing
+            the associated vectors. This can save lookup memory if your plain-int tags begin at zero and
+            increment with no gaps, but can waste memory if large plain-ints are used as tags without all
+            preceding ints also in use. If False, any plain-ints are treated as keys for lookup.
+
         Some important internal attributes are the following:
 
         Attributes
@@ -272,11 +283,6 @@ class Doc2Vec(Word2Vec):
 
                 >>> model.dv['doc003']
         """
-        corpus_iterable = documents
-
-        if dm_mean is not None:
-            self.cbow_mean = dm_mean
-
         self.dbow_words = int(dbow_words)
         self.dm_concat = int(dm_concat)
         self.dm_tag_count = int(dm_tag_count)
@@ -295,7 +301,7 @@ class Doc2Vec(Word2Vec):
             corpus_file=corpus_file,
             vector_size=self.vector_size,
             sg=(1 + dm) % 2,
-            null_word=self.dm_concat,
+            cbow_mean=dm_mean,
             callbacks=callbacks,
             window=window,
             epochs=epochs,
@@ -332,12 +338,35 @@ class Doc2Vec(Word2Vec):
         self.wv.norms = None
         self.dv.norms = None
 
-    def init_weights(self):
-        super(Doc2Vec, self).init_weights()
-        self.dv.resize_vectors(seed=self.seed)
+    def allocate_model(self, words_survey, tags_survey, keep_survey=True):
+        """
+        Build all internal model structures & subsidiary vector sets to ready model for training.
+
+        Parameters
+        ----------
+        word_survey : TokenSurvey
+            Survey of words in the expected training corpus
+        tags_survey : TokenSurvey
+            Survey of tags in the expected training corpus
+        keep_survey : bool, optional
+            If True (default), the surveys are cached in the model, which can be useful
+            for future debugging or model updates. If false, the method consults them
+            but does not store them in the model.
+
+        """
+        super(Doc2Vec, self).allocate_model(words_survey, keep_survey)
+        if self.dm_concat:
+            # mode needs a special null-word for windows extending past text
+            # as only ever input, never predicted, can be left out of other structures
+            self.wv.expand_for(['\0'], seed=self.seed)
+            self.wv.set_vecattr('\0', 'count', 1)  # maybe not necessary?
+        if keep_survey:
+            self.tags_survey = tags_survey
+        self.dv.reset_for(tags_survey.int_centric_items(), seed=self.seed)
 
     def reset_from(self, other_model):
-        """Copy shareable data structures from another (possibly pre-trained) model.
+        """TODO: determine if this is used/tested/needs-updating
+        Copy shareable data structures from another (possibly pre-trained) model.
 
         This specifically causes some structures to be shared, so is limited to
         structures (like those rleated to the known word/tag vocabularies) that
@@ -744,7 +773,7 @@ class Doc2Vec(Word2Vec):
             self.dv.save_word2vec_format(
                 fname, prefix=prefix, fvocab=fvocab, binary=binary,
                 write_header=write_header, append=append,
-                sort_attr='doc_count')
+            )
 
     @deprecated(
         "Gensim 4.0.0 implemented internal optimizations that make calls to init_sims() unnecessary. "
@@ -829,12 +858,12 @@ class Doc2Vec(Word2Vec):
         return super(Doc2Vec, self).estimate_memory(vocab_size, report=report)
 
     def build_vocab(self, corpus_iterable=None, corpus_file=None, update=False, progress_per=10000,
-                    keep_raw_vocab=False, trim_rule=None, **kwargs):
+                    keep_survey=True, trim_rule=None, **kwargs):
         """Build vocabulary from a sequence of documents (can be a once-only generator stream).
 
         Parameters
         ----------
-        documents : iterable of list of :class:`~gensim.models.doc2vec.TaggedDocument`, optional
+        corpus_iterable : iterable of list of :class:`~gensim.models.doc2vec.TaggedDocument`, optional
             Can be simply a list of :class:`~gensim.models.doc2vec.TaggedDocument` elements, but for larger corpora,
             consider an iterable that streams the documents directly from disk/network.
             See :class:`~gensim.models.doc2vec.TaggedBrownCorpus` or :class:`~gensim.models.doc2vec.TaggedLineDocument`
@@ -847,8 +876,9 @@ class Doc2Vec(Word2Vec):
             If true, the new words in `documents` will be added to model's vocab.
         progress_per : int
             Indicates how many words to process before showing/updating the progress.
-        keep_raw_vocab : bool
-            If not true, delete the raw vocabulary after the scaling is done and free up RAM.
+        keep_survey : bool
+            If False, the raw words/tags survey will be deleted after model initialization is done to free up RAM.
+            Default is to True to keep the survey around for reference or later updates.
         trim_rule : function, optional
             Vocabulary trimming rule, specifies whether certain words should remain in the vocabulary,
             be trimmed away, or handled using the default (discard if word count < min_count).
@@ -867,184 +897,92 @@ class Doc2Vec(Word2Vec):
             Additional key word arguments passed to the internal vocabulary construction.
 
         """
-        total_words, corpus_count = self.scan_vocab(
-            corpus_iterable=corpus_iterable, corpus_file=corpus_file,
-            progress_per=progress_per, trim_rule=trim_rule
-        )
-        self.corpus_count = corpus_count
-        self.corpus_total_words = total_words
-        report_values = self.prepare_vocab(update=update, keep_raw_vocab=keep_raw_vocab, trim_rule=trim_rule, **kwargs)
-
-        report_values['memory'] = self.estimate_memory(vocab_size=report_values['num_retained_words'])
-        self.prepare_weights(update=update)
-
-    def build_vocab_from_freq(self, word_freq, keep_raw_vocab=False, corpus_count=None, trim_rule=None, update=False):
-        """Build vocabulary from a dictionary of word frequencies.
-
-        Build model vocabulary from a passed dictionary that contains a (word -> word count) mapping.
-        Words must be of type unicode strings.
-
-        Parameters
-        ----------
-        word_freq : dict of (str, int)
-            Word <-> count mapping.
-        keep_raw_vocab : bool, optional
-            If not true, delete the raw vocabulary after the scaling is done and free up RAM.
-        corpus_count : int, optional
-            Even if no corpus is provided, this argument can set corpus_count explicitly.
-        trim_rule : function, optional
-            Vocabulary trimming rule, specifies whether certain words should remain in the vocabulary,
-            be trimmed away, or handled using the default (discard if word count < min_count).
-            Can be None (min_count will be used, look to :func:`~gensim.utils.keep_vocab_item`),
-            or a callable that accepts parameters (word, count, min_count) and returns either
-            :attr:`gensim.utils.RULE_DISCARD`, :attr:`gensim.utils.RULE_KEEP` or :attr:`gensim.utils.RULE_DEFAULT`.
-            The rule, if given, is only used to prune vocabulary during
-            :meth:`~gensim.models.doc2vec.Doc2Vec.build_vocab` and is not stored as part of the model.
-
-            The input parameters are of the following types:
-                * `word` (str) - the word we are examining
-                * `count` (int) - the word's frequency count in the corpus
-                * `min_count` (int) - the minimum count threshold.
-
-        update : bool, optional
-            If true, the new provided words in `word_freq` dict will be added to model's vocab.
-
-        """
-        logger.info("processing provided word frequencies")
-        # Instead of scanning text, this will assign provided word frequencies dictionary(word_freq)
-        # to be directly the raw vocab.
-        raw_vocab = word_freq
-        logger.info(
-            "collected %i different raw words, with total frequency of %i",
-            len(raw_vocab), sum(raw_vocab.values()),
+        self._check_corpus_sanity(
+            corpus_iterable=corpus_iterable, corpus_file=corpus_file, passes=1, items='TaggedDocuments',
         )
 
-        # Since no documents are provided, this is to control the corpus_count
-        self.corpus_count = corpus_count or 0
-        self.raw_vocab = raw_vocab
+        words_survey, tags_survey = self.scan_vocab(
+            corpus_iterable=corpus_iterable, corpus_file=corpus_file, progress_per=progress_per, trim_rule=trim_rule,
+        )
 
-        # trim by min_count & precalculate downsampling
-        report_values = self.prepare_vocab(keep_raw_vocab=keep_raw_vocab, trim_rule=trim_rule, update=update)
-        report_values['memory'] = self.estimate_memory(vocab_size=report_values['num_retained_words'])
-        self.prepare_weights(update=update)
-
-    def _scan_vocab(self, corpus_iterable, progress_per, trim_rule):
-        document_no = -1
-        total_words = 0
-        min_reduce = 1
-        interval_start = default_timer() - 0.00001  # guard against next sample being identical
-        interval_count = 0
-        checked_string_types = 0
-        vocab = defaultdict(int)
-        max_rawint = -1  # highest raw int tag seen (-1 for none)
-        doctags_lookup = {}
-        doctags_list = []
-        for document_no, document in enumerate(corpus_iterable):
-            if not checked_string_types:
-                if isinstance(document.words, str):
-                    logger.warning(
-                        "Each 'words' should be a list of words (usually unicode strings). "
-                        "First 'words' here is instead plain %s.",
-                        type(document.words),
-                    )
-                checked_string_types += 1
-            if document_no % progress_per == 0:
-                interval_rate = (total_words - interval_count) / (default_timer() - interval_start)
-                logger.info(
-                    "PROGRESS: at example #%i, processed %i words (%i/s), %i word types, %i tags",
-                    document_no, total_words, interval_rate, len(vocab), len(doctags_list)
-                )
-                interval_start = default_timer()
-                interval_count = total_words
-            document_length = len(document.words)
-
-            for tag in document.tags:
-                # Note a document tag during initial corpus scan, for structure sizing.
-                if isinstance(tag, (int, integer,)):
-                    max_rawint = max(max_rawint, tag)
-                else:
-                    if tag in doctags_lookup:
-                        doctags_lookup[tag].doc_count += 1
-                        doctags_lookup[tag].word_count += document_length
-                    else:
-                        doctags_lookup[tag] = Doctag(index=len(doctags_list), word_count=document_length, doc_count=1)
-                        doctags_list.append(tag)
-
-            for word in document.words:
-                vocab[word] += 1
-            total_words += len(document.words)
-
-            if self.max_vocab_size and len(vocab) > self.max_vocab_size:
-                utils.prune_vocab(vocab, min_reduce, trim_rule=trim_rule)
-                min_reduce += 1
-
-        corpus_count = document_no + 1
-        if len(doctags_list) > corpus_count:
-            logger.warning("More unique tags (%i) than documents (%i).", len(doctags_list), corpus_count)
-        if max_rawint > corpus_count:
-            logger.warning(
-                "Highest int doctag (%i) larger than count of documents (%i). This means "
-                "at least %i excess, unused slots (%i bytes) will be allocated for vectors.",
-                max_rawint, corpus_count, ((max_rawint - corpus_count) * self.vector_size * 4))
-        if max_rawint > -1:
-            # adjust indexes/list to account for range of pure-int keyed doctags
-            for key in doctags_list:
-                doctags_lookup[key].index = doctags_lookup[key].index + max_rawint + 1
-            doctags_list = list(range(0, max_rawint + 1)) + doctags_list
-
-        self.dv.index_to_key = doctags_list
-        for t, dt in doctags_lookup.items():
-            self.dv.key_to_index[t] = dt.index
-            self.dv.set_vecattr(t, 'word_count', dt.word_count)
-            self.dv.set_vecattr(t, 'doc_count', dt.doc_count)
-        self.raw_vocab = vocab
-        return total_words, corpus_count
+        # initialize or update model to match discovered vocabulary in survey & model settings
+        if not update:
+            self.allocate_model(words_survey, tags_survey, keep_survey=keep_survey)
+        else:
+            # UNCLEAR IF WE ACTUALLY SUPPORT THIS, as `update=True` has regularly crashed
+            # IF WE DO: TODO: implement `update_model()`
+            self.update_model(words_survey, tags_survey, keep_survey=keep_survey)
 
     def scan_vocab(self, corpus_iterable=None, corpus_file=None, progress_per=10000, trim_rule=None):
-        """Create the models Vocabulary: A mapping from unique words in the corpus to their frequency count.
+        """
+        Scan the provided corpus, returning TokenSurveys of frequency & other statistics of its words and tags.
 
         Parameters
         ----------
-        documents : iterable of :class:`~gensim.models.doc2vec.TaggedDocument`, optional
-            The tagged documents used to create the vocabulary. Their tags can be either str tokens or ints (faster).
+        corpus_iterable : iterable of list of str
+            As described in :meth:`~gensim.models.doc2vec.Doc2Vec.build_vocab`
         corpus_file : str, optional
-            Path to a corpus file in :class:`~gensim.models.word2vec.LineSentence` format.
-            You may use this argument instead of `documents` to get performance boost. Only one of `documents` or
-            `corpus_file` arguments need to be passed (not both of them).
+            As described in :meth:`~gensim.models.doc2vec.Doc2Vec.build_vocab`
         progress_per : int
-            Progress will be logged every `progress_per` documents.
+            As described in :meth:`~gensim.models.doc2vec.Doc2Vec.build_vocab`
         trim_rule : function, optional
-            Vocabulary trimming rule, specifies whether certain words should remain in the vocabulary,
-            be trimmed away, or handled using the default (discard if word count < min_count).
-            Can be None (min_count will be used, look to :func:`~gensim.utils.keep_vocab_item`),
-            or a callable that accepts parameters (word, count, min_count) and returns either
-            :attr:`gensim.utils.RULE_DISCARD`, :attr:`gensim.utils.RULE_KEEP` or :attr:`gensim.utils.RULE_DEFAULT`.
-            The rule, if given, is only used to prune vocabulary during
-            :meth:`~gensim.models.doc2vec.Doc2Vec.build_vocab` and is not stored as part of the model.
-
-            The input parameters are of the following types:
-                * `word` (str) - the word we are examining
-                * `count` (int) - the word's frequency count in the corpus
-                * `min_count` (int) - the minimum count threshold.
+            As described in :meth:`~gensim.models.doc2vec.Doc2Vec.build_vocab`
 
         Returns
         -------
-        (int, int)
-            Tuple of (Total words in the corpus, number of documents)
-
+        (TokenSurvey, TokenSurvey)
+            A words survey, and tags survey, with frequencies & other statistics useful for initialization/updates.
         """
-        logger.info("collecting all words and their counts")
+        logger.info("collecting all documents and word counts")
         if corpus_file is not None:
             corpus_iterable = TaggedLineDocument(corpus_file)
 
-        total_words, corpus_count = self._scan_vocab(corpus_iterable, progress_per, trim_rule)
+        words_survey = TokenSurvey(prune_at_size=self.max_vocab_size, items='words')
+        tags_survey = TokenSurvey(items='tags')
+
+        # to do both surveys in parallel with one pass over `corpus_iterable`, we
+        # prepare separate words and tags iterables as queues
+        w_iq = IterableQueue(1000)
+        t_iq = IterableQueue(1000)
+
+        # set a 'pump' thread to simply split original to separate words/tags
+        pump_t = Thread(
+            target=(lambda: (all((w_iq.put(td.words), t_iq.put(td.tags)) for td in corpus_iterable),
+                             w_iq.close(),
+                             t_iq.close())
+        ))
+        pump_t.start()
+        # set a 'words' thread to process the words iterable
+        words_t = Thread(target=lambda: words_survey.update_with(
+            w_iq, progress_per=progress_per, trim_rule=trim_rule
+        ))
+        words_t.start()
+        # use the current thread to process the tags iterable
+        tags_survey.update_with(t_iq, progress_per=progress_per)
+
+        words_t.join()
+        pump_t.join()
+
+        if len(tags_survey) > tags_survey.corpus_count:
+            # maybe this shouldn't be a warning, as more than 1 tag per doc is allowed but less-common
+            logger.warning(
+                f"More unique tags ({len(tags_survey)}) than documents ({tags_survey.corpus_count})."
+            )
+        if tags_survey.max_rawint > len(tags_survey):
+            min_excess = tags_survey.max_rawint + 1 - len(tags_survey)
+            excess_bytes = min_excess * self.vector_size * 4
+            logger.warning(
+                f"Highest plain-int token ({self.max_raw_int}) larger than count of all tags ({len(tags_survey)}). "
+                f"This usually indicates large & non-contiguous plain-int tokens, which will cause at least "
+                f"{min_excess} excess, unused slots ({excess_bytes} bytes) to be allocated for vectors."
+            )
 
         logger.info(
-            "collected %i word types and %i unique tags from a corpus of %i examples and %i words",
-            len(self.raw_vocab), len(self.dv), corpus_count, total_words
+            f"collected {len(words_survey)} word types and {len(tags_survey)} unique tags "
+            f"from a corpus of {words_survey.total_tokens} raw words "
+            f"and {words_survey.corpus_count} texts"
         )
-
-        return total_words, corpus_count
+        return words_survey, tags_survey
 
     def similarity_unseen_docs(self, doc_words1, doc_words2, alpha=None, min_alpha=None, steps=None):
         """Compute cosine similarity between two post-bulk out of training documents.

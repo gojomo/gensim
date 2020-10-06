@@ -323,9 +323,58 @@ class KeyedVectors(utils.SaveLoad):
         index = self.get_index(key)
         return self.expandos[attr][index]
 
-    def resize_vectors(self, seed=0):
-        """Make underlying vectors match index_to_key size; random-initialize any new rows."""
+    def get_allattr(self, attr):
+        """Get all vecattr values for the given attribute.
 
+        (That is, the raw array holding that attribute for all keys.)
+
+        Parameters
+        ----------
+
+        attr : str
+            Name of the additional attribute for which all values are wanted
+
+        Returns
+        -------
+
+        object
+            Array of the additional attribute for all keys
+
+        """
+        return self.expandos[attr]
+
+    def reset_for(self, keys_and_counts, seed=0):
+        """
+        Initialize to hold (randomly-initialized) vectors for exactly the given keys and counts.
+        """
+        self.index_to_key = [None] * len(keys_and_counts)
+        self.key_to_index = {}
+        self.expandos = {}
+        self.norms = None
+        for i, (key, count) in enumerate(keys_and_counts):
+            self.index_to_key[i] = key
+            if i is not key:  # skip mappings if key is int same as index
+                self.key_to_index[key] = i
+            self.set_vecattr(i, 'count', count)
+        self.next_index = len(self.index_to_key)
+        self.resize_vectors(seed=seed)
+
+    def expand_for(self, keys, seed=0):
+        """
+        Expand to hold new (random-initialized) vectors for the additional given keys, added at end.
+
+        Note: after such expansion, entries may not still be in the conventional descending-frequency order.
+        """
+
+        self.index_to_key = self.index_to_key + keys
+        self.key_to_index = {k: i for i, k in enumerate(self.index_to_key)}
+        self.next_index = len(self.index_to_key)
+        self.resize_vectors(seed=seed)
+
+    def resize_vectors(self, seed=0):
+        """
+        Make underlying vectors match index_to_key size; random-initialize any new rows.
+        """
         target_shape = (len(self.index_to_key), self.vector_size)
         self.vectors = prep_vectors(target_shape, prior_vectors=self.vectors, seed=seed)
         # TODO: support memmap?
