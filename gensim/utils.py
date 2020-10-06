@@ -27,6 +27,7 @@ import sys
 import subprocess
 import inspect
 import heapq
+from queue import Queue
 
 import numpy as np
 import scipy.sparse
@@ -2105,3 +2106,18 @@ def effective_n_jobs(n_jobs):
     elif n_jobs < 0:
         n_jobs = max(multiprocessing.cpu_count() + 1 + n_jobs, 1)
     return n_jobs
+
+
+class IterableQueue(Queue):
+    """A thread-safe queue that can be used as an iterable.
+
+    Per rhettinger at https://stackoverflow.com/a/11288503
+    """
+
+    _sentinel = object()
+
+    def __iter__(self):
+        return iter(self.get, self._sentinel)
+
+    def close(self):
+        self.put(self._sentinel)
