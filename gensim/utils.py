@@ -36,6 +36,8 @@ from smart_open import open
 
 logger = logging.getLogger(__name__)
 
+#: Preferred pickle_protocol version
+GENSIM_PICKLE_PROTOCOL = 4
 
 PAT_ALPHABETIC = re.compile(r'(((?![\d])\w)+)', re.UNICODE)
 RE_HTML_ENTITY = re.compile(r'&(#?)([xX]?)(\w{1,8});', re.UNICODE)
